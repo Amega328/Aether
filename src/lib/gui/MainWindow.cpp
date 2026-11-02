@@ -50,10 +50,13 @@
 #include <QNetworkInterface>
 #include <QPushButton>
 #include <QStyle>
+#include <QToolButton>
+#include <QHostAddress>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QScreen>
 #include <QScrollBar>
+#include <QSignalBlocker>
 
 #include <memory>
 
@@ -85,16 +88,27 @@ MainWindow::MainWindow()
       m_actionRestartCore{new QAction(this)},
       m_actionStopCore{new QAction(this)},
       m_actionShowHelp{new QAction(this)},
+      m_actionCheckUpdates{new QAction(this)},
       m_networkMonitor{new NetworkMonitor(this)}
 {
   ui->setupUi(this);
   ui->connectionMetricsLayout->setAlignment(Qt::AlignCenter);
-  m_btnCheckUpdates = new QPushButton(tr("Check for updates"), this);
-  m_btnCheckUpdates->setIcon(QIcon::fromTheme(QStringLiteral("software-updates")));
-  m_btnCheckUpdates->setToolTip(tr("Check whether a newer Aether version is available"));
-  m_btnCheckUpdates->setMinimumHeight(30);
-  ui->horizontalLayout_5->addWidget(m_btnCheckUpdates);
-  connect(m_btnCheckUpdates, &QPushButton::clicked, this, [this] {
+  m_btnSettingsMenu = new QToolButton(this);
+  m_btnSettingsMenu->setIcon(QIcon::fromTheme(QStringLiteral("configure")));
+  m_btnSettingsMenu->setToolTip(tr("Settings and update options"));
+  m_btnSettingsMenu->setAccessibleName(tr("Settings and update options"));
+  m_btnSettingsMenu->setPopupMode(QToolButton::InstantPopup);
+  auto *settingsMenu = new QMenu(m_btnSettingsMenu);
+  settingsMenu->addAction(m_actionSettings);
+  settingsMenu->addSeparator();
+  settingsMenu->addAction(m_actionCheckUpdates);
+  m_btnSettingsMenu->setMenu(settingsMenu);
+  ui->horizontalLayout_5->addWidget(m_btnSettingsMenu);
+  connect(m_actionCheckUpdates, &QAction::triggered, this, [this] {
+    if (!m_availableUpdateVersion.isEmpty()) {
+      openGetNewVersionUrl();
+      return;
+    }
     m_manualUpdateCheck = true;
     m_versionChecker.checkLatest();
   });
@@ -413,29 +427,31 @@ void MainWindow::connectSlots()
   connect(m_logDock->toggleViewAction(), &QAction::toggled, this, &MainWindow::toggleLogVisible);
 
   connect(m_statusBar, &StatusBar::requestShowMyFingerprints, this, &MainWindow::showMyFingerprint);
-  connect(m_statusBar, &StatusBar::requestUpdateVersion, this, &MainWindow::openGetNewVersionUrl);
-  connect(&m_versionChecker, &VersionChecker::updateFound, m_statusBar, &StatusBar::updateFound);
   connect(&m_versionChecker, &VersionChecker::checkStarted, this, [this] {
-    m_btnCheckUpdates->setEnabled(false);
-    m_btnCheckUpdates->setText(tr("Checking…"));
+    m_actionCheckUpdates->setEnabled(false);
+    m_actionCheckUpdates->setText(tr("Checking…"));
   });
   connect(&m_versionChecker, &VersionChecker::upToDate, this, [this] {
-    m_btnCheckUpdates->setEnabled(true);
-    m_btnCheckUpdates->setText(tr("Check for updates"));
+    m_actionCheckUpdates->setEnabled(true);
+    m_actionCheckUpdates->setText(tr("Check for updates"));
+    m_actionCheckUpdates->setToolTip(QString());
+    m_availableUpdateVersion.clear();
     if (m_manualUpdateCheck)
       QMessageBox::information(this, tr("Aether is up to date"), tr("You’re running the latest version of Aether."));
     m_manualUpdateCheck = false;
   });
   connect(&m_versionChecker, &VersionChecker::checkFailed, this, [this](const QString &error) {
-    m_btnCheckUpdates->setEnabled(true);
-    m_btnCheckUpdates->setText(tr("Check for updates"));
+    m_actionCheckUpdates->setEnabled(true);
+    m_actionCheckUpdates->setText(tr("Check for updates"));
     if (m_manualUpdateCheck)
       QMessageBox::warning(this, tr("Update check failed"), tr("Could not check for updates.\n\n%1").arg(error));
     m_manualUpdateCheck = false;
   });
   connect(&m_versionChecker, &VersionChecker::updateFound, this, [this](const QString &version) {
-    m_btnCheckUpdates->setEnabled(true);
-    m_btnCheckUpdates->setText(tr("Check for updates"));
+    m_actionCheckUpdates->setEnabled(true);
+    m_availableUpdateVersion = version;
+    m_actionCheckUpdates->setText(tr("Update available: v%1").arg(version));
+    m_actionCheckUpdates->setToolTip(tr("Click to download Aether v%1").arg(version));
     if (!m_manualUpdateCheck)
       return;
     m_manualUpdateCheck = false;
@@ -862,8 +878,17 @@ void MainWindow::applyConfig()
     setWindowTitle(kAppName);
   }
 
-  if (const auto host = Settings::value(Settings::Client::RemoteHost).toString(); !host.isEmpty())
+  if (auto host = Settings::value(Settings::Client::RemoteHost).toString(); !host.isEmpty()) {
+    const auto labelStart = host.lastIndexOf(QStringLiteral(" ("));
+    if (labelStart >= 0 && host.endsWith(')')) {
+      host = host.mid(labelStart + 2, host.size() - labelStart - 3);
+      const QHostAddress address(host);
+      if (address.protocol() == QAbstractSocket::IPv6Protocol && address.toString().startsWith("::ffff:", Qt::CaseInsensitive))
+        host = QHostAddress(address.toIPv4Address()).toString();
+      Settings::setValue(Settings::Client::RemoteHost, host);
+    }
     ui->comboRemoteHost->setCurrentText(host);
+  }
 
   updateFingerprintButton();
   setTrayIcon();
@@ -1162,12 +1187,19 @@ void MainWindow::onDiscoveredServer(const QString &screenName, const QString &ad
   if (screenName == Settings::value(Settings::Core::ComputerName).toString())
     return;
 
+  const auto currentText = ui->comboRemoteHost->currentText();
+  const QSignalBlocker blocker(ui->comboRemoteHost);
   const auto label = QStringLiteral("%1 (%2)").arg(screenName, address);
-  const int i = ui->comboRemoteHost->findData(screenName);
-  if (i < 0)
-    ui->comboRemoteHost->addItem(label, screenName);
-  else
+  const int i = ui->comboRemoteHost->findData(screenName, Qt::UserRole + 1);
+  if (i < 0) {
+    const auto index = ui->comboRemoteHost->count();
+    ui->comboRemoteHost->addItem(label, address);
+    ui->comboRemoteHost->setItemData(index, screenName, Qt::UserRole + 1);
+  } else {
     ui->comboRemoteHost->setItemText(i, label);
+    ui->comboRemoteHost->setItemData(i, address);
+  }
+  ui->comboRemoteHost->setCurrentText(currentText);
 }
 
 void MainWindow::updateAnnounceState()
@@ -1309,6 +1341,7 @@ void MainWindow::updateText()
   //: %1 will be the replaced with the appname
   m_actionRestore->setText(tr("&Open %1").arg(kAppName));
   m_actionSettings->setText(tr("&Preferences"));
+  m_actionCheckUpdates->setText(tr("Check for updates"));
   m_actionStartCore->setText(tr("&Start"));
   m_actionRestartCore->setText(tr("Rest&art"));
   m_actionStopCore->setText(tr("S&top"));
@@ -1548,12 +1581,19 @@ void MainWindow::toggleCanRunCore(bool enableButtons)
 
 void MainWindow::remoteHostChanged(const QString &newRemoteHost)
 {
-  m_coreProcess.setAddress(newRemoteHost);
-  toggleCanRunCore(!newRemoteHost.isEmpty() && ui->rbModeClient->isChecked());
-  if (newRemoteHost.isEmpty()) {
+  auto address = newRemoteHost;
+  const auto discoveredIndex = ui->comboRemoteHost->findText(newRemoteHost);
+  if (discoveredIndex >= 0) {
+    const auto discoveredAddress = ui->comboRemoteHost->itemData(discoveredIndex).toString();
+    if (!discoveredAddress.isEmpty())
+      address = discoveredAddress;
+  }
+  m_coreProcess.setAddress(address);
+  toggleCanRunCore(!address.isEmpty() && ui->rbModeClient->isChecked());
+  if (address.isEmpty()) {
     Settings::setValue(Settings::Client::RemoteHost);
   } else {
-    Settings::setValue(Settings::Client::RemoteHost, newRemoteHost);
+    Settings::setValue(Settings::Client::RemoteHost, address);
   }
 }
 

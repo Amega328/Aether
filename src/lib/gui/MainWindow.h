@@ -30,7 +30,7 @@
 class QAction;
 class QMenu;
 class QLocalServer;
-class QPushButton;
+class QToolButton;
 
 class AetherApplication;
 class LogDock;
@@ -194,8 +194,9 @@ private:
 
   LogDock *m_logDock;
   StatusBar *m_statusBar = nullptr;
-  QPushButton *m_btnCheckUpdates = nullptr;
+  QToolButton *m_btnSettingsMenu = nullptr;
   bool m_manualUpdateCheck = false;
+  QString m_availableUpdateVersion;
   aether::gui::LanDiscovery m_discovery;
   std::function<void()> m_updatePortShareSave;
 
@@ -216,6 +217,7 @@ private:
   QAction *m_actionRestartCore = nullptr;
   QAction *m_actionStopCore = nullptr;
   QAction *m_actionShowHelp = nullptr;
+  QAction *m_actionCheckUpdates = nullptr;
 
   // Network monitoring
   NetworkMonitor *m_networkMonitor = nullptr;

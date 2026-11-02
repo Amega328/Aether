@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.2.4] - 2026-11-02
+
+### Changed
+- Replaced the standalone update button with a settings dropdown and moved
+  update availability feedback into that menu.
+- Send users to the latest GitHub release instead of the nonexistent download
+  route.
+
+### Fixed
+- LAN-discovered servers now connect using their advertised IP address rather
+  than the display name, and discovery labels no longer overwrite the saved
+  connection address.
+- Normalize previously saved discovery labels into their address when possible.
+
 ## [v1.2.3] - 2026-10-30
 
 ### Added
