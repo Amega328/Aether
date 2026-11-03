@@ -8,7 +8,10 @@
 
 #include "aether/ClipboardTypes.h"
 #include "aether/IClipboard.h"
+#include <chrono>
+#include <condition_variable>
 #include <mutex>
+#include <thread>
 
 namespace aether {
 
@@ -33,6 +36,12 @@ public:
   //@{
   bool empty() override;
   void add(Format, const std::string &data) override;
+  //! Open the clipboard, waiting if another thread has it open.
+  /*!
+  The portal thread (serving pastes) and the event thread (storing data from
+  the server) share one cache, so an open()/close() session is exclusive
+  across threads. The thread holding it may call open() again.
+  */
   bool open(Time) const override;
   void close() const override;
   Time getTime() const override;
@@ -41,10 +50,16 @@ public:
   //@}
 
 private:
+  // Sessions are in-memory copies and last milliseconds; this only bounds the
+  // damage if a close() is ever missed.
+  static constexpr std::chrono::seconds kOpenTimeout{5};
+
   ClipboardID m_id;
   mutable bool m_open = false;
+  mutable std::thread::id m_openThread;
   mutable Time m_time = 0;
   mutable std::mutex m_mutex;
+  mutable std::condition_variable m_closed;
   bool m_owner = false;
   Time m_timeOwned = 0;
   bool m_added[static_cast<int>(Format::TotalFormats)] = {false, false, false};

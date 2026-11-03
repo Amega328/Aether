@@ -33,6 +33,23 @@ elseif(UNIX)
       SOURCE EiKeyStateTests.cpp
       WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/platform"
     )
+    create_test(
+      NAME EiClipboardTests
+      DEPENDS platform
+      LIBS base arch
+      SOURCE EiClipboardTests.cpp
+      WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/platform"
+    )
+  endif()
+
+  if(LIBEI_FOUND AND HAVE_LP_CLIPBOARD)
+    create_test(
+      NAME PortalClipboardTests
+      DEPENDS platform
+      LIBS base arch app
+      SOURCE PortalClipboardTests.cpp
+      WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/platform"
+    )
   endif()
 
   if (BUILD_X11_SUPPORT)

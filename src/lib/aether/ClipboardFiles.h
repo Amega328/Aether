@@ -52,4 +52,16 @@ stagingDir, in payload order.
 */
 std::vector<std::filesystem::path> unpackFiles(std::string_view data, const std::filesystem::path &stagingDir);
 
+//! Percent-encoded "file://" URI for an absolute path.
+std::string toFileUri(const std::filesystem::path &absolutePath);
+
+//! Local paths named by a text/uri-list body.
+/*!
+Lines may end in CR, LF or CRLF. Comments, non-file schemes, remote hosts and
+malformed URIs are skipped, so a gnome-copied-files body ("copy" or "cut" on
+the first line) parses the same way. Trailing slashes are dropped so a
+directory URI yields a path with a usable filename().
+*/
+std::vector<std::filesystem::path> fromUriList(std::string_view uriList);
+
 } // namespace aether::clipboard

@@ -8,7 +8,9 @@
 
 #include "base/Log.h"
 
+#include <cctype>
 #include <fstream>
+#include <optional>
 #include <set>
 
 namespace {
@@ -245,4 +247,112 @@ aether::clipboard::unpackFiles(std::string_view data, const std::filesystem::pat
 
   LOG_DEBUG("unpacked %u clipboard file entries to %s", count, stagingDir.string().c_str());
   return topLevel;
+}
+
+std::string aether::clipboard::toFileUri(const std::filesystem::path &absolutePath)
+{
+  constexpr std::string_view kHex = "0123456789ABCDEF";
+  const auto bytes = toUtf8(absolutePath);
+
+  std::string uri = "file://";
+  if (bytes.empty() || bytes.front() != '/')
+    uri += '/';
+  for (const char ch : bytes) {
+    const auto c = static_cast<unsigned char>(ch);
+    const bool plain = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' ||
+                       c == '.' || c == '_' || c == '~' || c == '/';
+    if (plain) {
+      uri += ch;
+    } else {
+      uri += '%';
+      uri += kHex[c >> 4];
+      uri += kHex[c & 0x0f];
+    }
+  }
+  return uri;
+}
+
+namespace {
+
+int hexValue(char c)
+{
+  if (c >= '0' && c <= '9')
+    return c - '0';
+  if (c >= 'a' && c <= 'f')
+    return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F')
+    return c - 'A' + 10;
+  return -1;
+}
+
+bool startsWithNoCase(std::string_view text, std::string_view prefix)
+{
+  if (text.size() < prefix.size())
+    return false;
+  for (size_t i = 0; i < prefix.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(text[i])) != prefix[i])
+      return false;
+  }
+  return true;
+}
+
+std::optional<std::filesystem::path> pathFromFileUri(std::string_view uri)
+{
+  if (!startsWithNoCase(uri, "file:"))
+    return std::nullopt;
+  uri.remove_prefix(5);
+
+  if (uri.starts_with("//")) {
+    uri.remove_prefix(2);
+    const auto hostEnd = uri.find('/');
+    if (hostEnd == std::string_view::npos)
+      return std::nullopt;
+    const auto host = uri.substr(0, hostEnd);
+    constexpr std::string_view kLocalhost = "localhost";
+    if (!host.empty() && !(host.size() == kLocalhost.size() && startsWithNoCase(host, kLocalhost)))
+      return std::nullopt;
+    uri.remove_prefix(hostEnd);
+  }
+
+  std::string decoded;
+  decoded.reserve(uri.size());
+  for (size_t i = 0; i < uri.size(); ++i) {
+    if (uri[i] != '%') {
+      decoded += uri[i];
+      continue;
+    }
+    if (i + 2 >= uri.size())
+      return std::nullopt;
+    const int hi = hexValue(uri[i + 1]);
+    const int lo = hexValue(uri[i + 2]);
+    if (hi < 0 || lo < 0)
+      return std::nullopt;
+    decoded += static_cast<char>((hi << 4) | lo);
+    i += 2;
+  }
+
+  if (decoded.empty() || decoded.front() != '/' || decoded.find('\0') != std::string::npos)
+    return std::nullopt;
+  while (decoded.size() > 1 && decoded.back() == '/')
+    decoded.pop_back();
+
+  return std::filesystem::path(std::u8string(decoded.begin(), decoded.end()));
+}
+
+} // namespace
+
+std::vector<std::filesystem::path> aether::clipboard::fromUriList(std::string_view uriList)
+{
+  std::vector<std::filesystem::path> paths;
+  while (!uriList.empty()) {
+    const auto lineEnd = uriList.find_first_of("\r\n");
+    const auto line = uriList.substr(0, lineEnd);
+    uriList.remove_prefix(lineEnd == std::string_view::npos ? uriList.size() : lineEnd + 1);
+
+    if (line.empty() || line.front() == '#')
+      continue;
+    if (auto path = pathFromFileUri(line))
+      paths.push_back(std::move(*path));
+  }
+  return paths;
 }

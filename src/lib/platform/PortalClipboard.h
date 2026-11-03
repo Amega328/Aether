@@ -25,10 +25,13 @@ public:
     IClipboard::Format format;
   };
 
-  // Listed in preference order: richer formats first.
+  static constexpr const char *kGnomeCopiedFilesMime = "x-special/gnome-copied-files";
+
+  // Listed in preference order: richer formats first. Files maps to two mimes:
+  // text/uri-list for most toolkits, and gnome-copied-files for GTK file managers.
   static constexpr SupportedMime kSupportedMimes[] = {
-      {"image/png", IClipboard::Format::Bitmap},
-      {"text/plain;charset=utf-8", IClipboard::Format::Text},
+      {"text/uri-list", IClipboard::Format::Files}, {kGnomeCopiedFilesMime, IClipboard::Format::Files},
+      {"image/png", IClipboard::Format::Bitmap},    {"text/plain;charset=utf-8", IClipboard::Format::Text},
       {"text/plain", IClipboard::Format::Text},
   };
 
@@ -39,8 +42,13 @@ public:
   static QByteArray formatMimeTypes(const char *const *mimeTypes);
   static const SupportedMime *findSupportedMime(const char *mime);
   static const SupportedMime *pickSupportedMime(const char *const *available);
-  static QByteArray encodeFormat(IClipboard::Format format, const QByteArray &data);
-  static QByteArray decodeFormat(IClipboard::Format format, const QByteArray &bytes);
+  /// Convert cached clipboard data to the wire form of \p entry. For Files this
+  /// stages the received payload on disk and returns a list of file URIs.
+  static QByteArray encodeFormat(const SupportedMime &entry, const QByteArray &data);
+
+  /// Convert bytes read from the portal into cached clipboard data. For Files
+  /// this packs the files named by the URI list, up to \p maxBytes of content.
+  static QByteArray decodeFormat(const SupportedMime &entry, const QByteArray &bytes, qint64 maxBytes);
   static QByteArray readSelectionBytes(XdpSession *session, const char *mime, qint64 maxBytes);
 
   /// Advertise the cache's formats to the portal selection.

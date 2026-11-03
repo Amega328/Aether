@@ -20,6 +20,10 @@ private Q_SLOTS:
   void unsafeNames();
   void truncatedData();
   void sizeLimit();
+  void fileUriEncoding();
+  void uriListParsing();
+  void uriListSkipsNonLocal();
+  void uriListFeedsPack();
 
 private:
   QTemporaryDir m_dir;

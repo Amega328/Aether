@@ -59,13 +59,20 @@ void EiClipboard::add(Format format, const std::string &data)
 
 bool EiClipboard::open(Time time) const
 {
-  std::scoped_lock lock{m_mutex};
-  if (m_open) {
+  std::unique_lock lock{m_mutex};
+  const auto self = std::this_thread::get_id();
+  if (m_open && m_openThread == self) {
     LOG_DEBUG("skipping clipboard open, already open");
     return true;
   }
 
+  if (!m_closed.wait_for(lock, kOpenTimeout, [this] { return !m_open; }))
+    LOG_WARN(
+        "clipboard still open on another thread after %lld s, taking over", static_cast<long long>(kOpenTimeout.count())
+    );
+
   m_open = true;
+  m_openThread = self;
   m_time = time;
 
   return true;
@@ -78,6 +85,8 @@ void EiClipboard::close() const
     LOG_WARN("clipboard is not open");
   }
   m_open = false;
+  m_openThread = {};
+  m_closed.notify_one();
 }
 
 EiClipboard::Time EiClipboard::getTime() const

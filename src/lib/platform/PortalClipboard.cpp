@@ -6,12 +6,19 @@
 
 #include "platform/PortalClipboard.h"
 
+#include "aether/ClipboardFiles.h"
 #include "base/Log.h"
 #include "platform/EiClipboard.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cstring>
+#include <filesystem>
+#include <functional>
+#include <mutex>
 #include <poll.h>
 #include <unistd.h>
+#include <utility>
 
 #include <QBuffer>
 #include <QByteArrayList>
@@ -21,6 +28,7 @@
 #include <QList>
 #include <QPair>
 #include <QSet>
+#include <QStandardPaths>
 #include <QVarLengthArray>
 #include <QtEndian>
 
@@ -29,6 +37,79 @@ namespace aether {
 static constexpr int kBmpSignatureSize = 2;
 static constexpr quint32 kBmpFileHeaderSize = 14;
 static constexpr quint32 kMinDibHeaderSize = 12;
+
+namespace {
+
+namespace fs = std::filesystem;
+
+// Pasted files are copied out of the staging dir, so it only needs to outlive
+// a paste in progress.
+constexpr auto kStagingMaxAge = std::chrono::hours(1);
+
+struct StagedFiles
+{
+  size_t hash = 0;
+  size_t size = 0;
+  fs::path dir;
+  std::vector<fs::path> topLevel;
+};
+
+fs::path stagingRoot()
+{
+  auto cache = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation);
+  if (cache.isEmpty())
+    return fs::temp_directory_path() / "Aether" / "clipboard";
+  return fs::path(cache.toStdString()) / "Aether" / "clipboard";
+}
+
+void pruneStaging(const fs::path &root, bool all)
+{
+  std::error_code ec;
+  const auto now = fs::file_time_type::clock::now();
+  for (const auto &entry : fs::directory_iterator(root, ec)) {
+    std::error_code entryEc;
+    const auto modified = entry.last_write_time(entryEc);
+    if (!all && !entryEc && now - modified < kStagingMaxAge)
+      continue;
+    fs::remove_all(entry.path(), entryEc);
+  }
+}
+
+// Files received from the server only exist as a packed payload. File managers
+// need real paths, so unpack on the first transfer request and reuse the result
+// while the same payload stays on the clipboard (each mime asks separately).
+std::vector<fs::path> stageFiles(const QByteArray &payload)
+{
+  static std::mutex mutex;
+  static StagedFiles current;
+  static uint32_t counter = 0;
+  static bool firstUse = true;
+
+  std::scoped_lock lock{mutex};
+
+  const std::string_view view(payload.constData(), static_cast<size_t>(payload.size()));
+  const auto hash = std::hash<std::string_view>{}(view);
+
+  std::error_code ec;
+  if (!current.dir.empty() && current.hash == hash && current.size == view.size() && fs::exists(current.dir, ec))
+    return current.topLevel;
+
+  const auto root = stagingRoot();
+  pruneStaging(root, std::exchange(firstUse, false));
+
+  const auto dir = root / ("clip-" + std::to_string(getpid()) + "-" + std::to_string(counter++));
+  try {
+    current = {hash, view.size(), dir, aether::clipboard::unpackFiles(view, dir)};
+  } catch (const std::exception &e) {
+    LOG_WARN("failed to stage clipboard files: %s", e.what());
+    fs::remove_all(dir, ec);
+    current = {};
+    return {};
+  }
+  return current.topLevel;
+}
+
+} // namespace
 
 QByteArray PortalClipboard::formatMimeTypes(const char *const *mimeTypes)
 {
@@ -100,12 +181,26 @@ QByteArray PortalClipboard::bmpToDib(const QByteArray &bmp)
   return bmp.mid(kBmpFileHeaderSize);
 }
 
-QByteArray PortalClipboard::encodeFormat(IClipboard::Format format, const QByteArray &data)
+QByteArray PortalClipboard::encodeFormat(const SupportedMime &entry, const QByteArray &data)
 {
   if (data.isEmpty())
     return {};
 
-  if (format == IClipboard::Format::Bitmap) {
+  if (entry.format == IClipboard::Format::Files) {
+    const auto staged = stageFiles(data);
+    if (staged.empty())
+      return {};
+
+    const bool gnome = g_strcmp0(entry.mime, kGnomeCopiedFilesMime) == 0;
+    QByteArray list = gnome ? QByteArrayLiteral("copy") : QByteArray{};
+    for (const auto &path : staged) {
+      const auto uri = QByteArray::fromStdString(aether::clipboard::toFileUri(path));
+      list += gnome ? "\n" + uri : uri + "\r\n";
+    }
+    return list;
+  }
+
+  if (entry.format == IClipboard::Format::Bitmap) {
     const auto bmpFile = dibToBmp(data);
     if (bmpFile.isEmpty()) {
       LOG_WARN("clipboard bitmap data is malformed");
@@ -131,12 +226,28 @@ QByteArray PortalClipboard::encodeFormat(IClipboard::Format format, const QByteA
   return data;
 }
 
-QByteArray PortalClipboard::decodeFormat(IClipboard::Format format, const QByteArray &bytes)
+QByteArray PortalClipboard::decodeFormat(const SupportedMime &entry, const QByteArray &bytes, qint64 maxBytes)
 {
   if (bytes.isEmpty())
     return {};
 
-  if (format == IClipboard::Format::Bitmap) {
+  if (entry.format == IClipboard::Format::Files) {
+    const auto paths = aether::clipboard::fromUriList(std::string_view(bytes.constData(), bytes.size()));
+    if (paths.empty()) {
+      LOG_DEBUG("clipboard uri list has no local files");
+      return {};
+    }
+
+    try {
+      const auto limit = std::min<uint64_t>(static_cast<uint64_t>(maxBytes), aether::clipboard::kMaxPackBytes);
+      return QByteArray::fromStdString(aether::clipboard::packFiles(paths, limit));
+    } catch (const std::exception &e) {
+      LOG_WARN("failed to pack clipboard files: %s", e.what());
+      return {};
+    }
+  }
+
+  if (entry.format == IClipboard::Format::Bitmap) {
     QImage image;
     if (!image.loadFromData(bytes, "PNG")) {
       LOG_WARN("failed to decode clipboard png");
@@ -228,7 +339,7 @@ void PortalClipboard::serveSelectionTransfer(EiClipboard *cache, XdpSession *ses
     raw = QByteArray::fromStdString(cache->get(requested->format));
   cache->close();
 
-  const auto data = encodeFormat(requested->format, raw);
+  const auto data = encodeFormat(*requested, raw);
   if (data.isEmpty()) {
     LOG_DEBUG("clipboard has no data for mime: %s", mime);
     xdp_session_selection_write_done(session, serial, false);
@@ -300,13 +411,13 @@ bool PortalClipboard::readSelectionIntoCache(
       continue;
     }
 
-    if (entry.format != IClipboard::Format::Bitmap) {
+    if (entry.format == IClipboard::Format::Text) {
       while (bytes.endsWith('\0'))
         bytes.chop(1);
       bytes.replace("\r\n", "\n");
     }
 
-    auto data = decodeFormat(entry.format, bytes);
+    auto data = decodeFormat(entry, bytes, maxBytes);
     if (data.isEmpty())
       continue;
 

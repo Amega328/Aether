@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Files and folders copied on a Windows server can now be pasted into file
+  managers on Wayland clients (via `text/uri-list` and
+  `x-special/gnome-copied-files`), and files copied on a Wayland client can be
+  pasted on Windows. Transfers are limited by the clipboard size setting.
+
+### Fixed
+- Wayland clients could end up with an empty clipboard when a paste request
+  arrived while a clipboard update from the server was being stored. The
+  clipboard cache is now exclusive across the portal and event threads, so a
+  paste can no longer break an update in progress.
+
 ## [v1.2.4] - 2026-11-02
 
 ### Changed
