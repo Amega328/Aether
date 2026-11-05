@@ -8,6 +8,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version label for the installer file names (default: dev-<short sha>)"
+        required: false
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -125,8 +130,17 @@ jobs:
 
       - name: Get version
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          echo "PACKAGE_VERSION=$(echo $GITHUB_REF | sed 's,refs/tags/v,,g')" >> $GITHUB_ENV
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          elif [[ -n "$INPUT_VERSION" ]]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="dev-${GITHUB_SHA::7}"
+          fi
+          echo "PACKAGE_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Verify dependencies
         shell: bash
