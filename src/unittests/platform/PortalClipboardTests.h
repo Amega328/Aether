@@ -22,6 +22,7 @@ private Q_SLOTS:
   void packRespectsSizeLimit();
   void invalidInputYieldsNothing();
   void textPassesThrough();
+  void repeatedSelectionIsStoredOnce();
 
 private:
   QTemporaryDir m_dir;

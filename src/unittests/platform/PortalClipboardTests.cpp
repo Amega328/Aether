@@ -8,6 +8,7 @@
 
 #include "aether/ClipboardFiles.h"
 #include "aether/TransferManifest.h"
+#include "platform/EiClipboard.h"
 #include "platform/PortalClipboard.h"
 
 #include <filesystem>
@@ -191,6 +192,26 @@ void PortalClipboardTests::textPassesThrough()
 {
   QCOMPARE(PortalClipboard::encodeFormat(mime("text/plain"), "hello"), QByteArray("hello"));
   QCOMPARE(PortalClipboard::decodeFormat(mime("text/plain"), "hello", 1024), QByteArray("hello"));
+}
+
+void PortalClipboardTests::repeatedSelectionIsStoredOnce()
+{
+  using Format = IClipboard::Format;
+  aether::EiClipboard cache(kClipboardClipboard);
+  const QList<QPair<Format, QByteArray>> copy{{Format::Files, "packed files"}, {Format::Text, "/home/a.txt"}};
+
+  // File managers announce one copy several times; only the first may count as a change.
+  QVERIFY(PortalClipboard::storeIfChanged(&cache, copy));
+  QVERIFY(!PortalClipboard::storeIfChanged(&cache, copy));
+  QVERIFY(!PortalClipboard::storeIfChanged(&cache, copy));
+
+  QVERIFY(PortalClipboard::storeIfChanged(&cache, {{Format::Files, "other files"}, {Format::Text, "/home/a.txt"}}));
+  QVERIFY(PortalClipboard::storeIfChanged(&cache, {{Format::Text, "/home/a.txt"}}));
+
+  cache.open(0);
+  QVERIFY(!cache.has(Format::Files));
+  QCOMPARE(cache.get(Format::Text), std::string("/home/a.txt"));
+  cache.close();
 }
 
 QTEST_MAIN(PortalClipboardTests)

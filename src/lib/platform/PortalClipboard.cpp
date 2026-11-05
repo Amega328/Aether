@@ -439,14 +439,39 @@ bool PortalClipboard::readSelectionIntoCache(
     return false;
   }
 
-  cache->open(0);
-  cache->empty();
-  for (const auto &[format, data] : reads)
-    cache->add(format, data.toStdString());
-  cache->close();
+  if (!storeIfChanged(cache, reads)) {
+    // Apps often announce one copy several times; each grab would resend and re-unpack it.
+    LOG_DEBUG("clipboard read local selection, unchanged");
+    return false;
+  }
 
   LOG_DEBUG("clipboard read local selection, formats: %lld", static_cast<long long>(reads.size()));
   return true;
+}
+
+bool PortalClipboard::storeIfChanged(EiClipboard *cache, const QList<QPair<IClipboard::Format, QByteArray>> &reads)
+{
+  cache->open(0);
+  bool changed = false;
+  for (int i = 0; i < static_cast<int>(IClipboard::Format::TotalFormats) && !changed; ++i) {
+    const auto format = static_cast<IClipboard::Format>(i);
+    const auto read = std::find_if(reads.begin(), reads.end(), [format](const auto &r) { return r.first == format; });
+    if (cache->has(format) != (read != reads.end())) {
+      changed = true;
+    } else if (read != reads.end()) {
+      const auto cached = cache->get(format);
+      changed = cached.size() != static_cast<size_t>(read->second.size()) ||
+                std::memcmp(cached.data(), read->second.constData(), cached.size()) != 0;
+    }
+  }
+
+  if (changed) {
+    cache->empty();
+    for (const auto &[format, data] : reads)
+      cache->add(format, data.toStdString());
+  }
+  cache->close();
+  return changed;
 }
 
 } // namespace aether

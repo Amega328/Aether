@@ -9,6 +9,8 @@
 #include "aether/IClipboard.h"
 
 #include <QByteArray>
+#include <QList>
+#include <QPair>
 
 #include <libportal/portal.h>
 
@@ -62,6 +64,9 @@ public:
   /// Returns true if any data was deposited.
   static bool
   readSelectionIntoCache(EiClipboard *cache, XdpSession *session, const char *const *mimeTypes, qint64 maxBytes);
+
+  /// Replace the cache with \p reads unless it already holds exactly that. True if it changed.
+  static bool storeIfChanged(EiClipboard *cache, const QList<QPair<IClipboard::Format, QByteArray>> &reads);
 
 private:
   static QByteArray dibToBmp(const QByteArray &dib);
