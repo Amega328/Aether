@@ -24,6 +24,7 @@ env:
 jobs:
   verify:
     name: Verify
+    if: github.event_name != 'push' || github.repository == 'RimoraStudio/Aether'
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -383,7 +384,7 @@ jobs:
   release:
     name: Release
     needs: [build-windows, build-linux, build-macos]
-    if: contains(github.ref, '/tags/v')
+    if: contains(github.ref, '/tags/v') && github.repository == 'RimoraStudio/Aether'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -456,7 +457,7 @@ jobs:
   notify:
     name: Notify Telegram
     needs: [build-windows, build-linux, build-macos]
-    if: always()
+    if: always() && (github.event_name != 'push' || github.repository == 'RimoraStudio/Aether')
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
