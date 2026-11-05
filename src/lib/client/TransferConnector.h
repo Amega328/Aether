@@ -12,6 +12,7 @@
 #include "net/SecurityLevel.h"
 
 #include <memory>
+#include <string>
 #include <vector>
 
 class Event;
@@ -32,7 +33,7 @@ class TransferConnector
 public:
   TransferConnector(
       IEventQueue *events, std::unique_ptr<ISocketFactory> socketFactory, const NetworkAddress &serverAddress,
-      bool secure
+      bool secure, aether::transfer::TransferHub *hub = nullptr
   );
   TransferConnector(const TransferConnector &) = delete;
   TransferConnector &operator=(const TransferConnector &) = delete;
@@ -55,11 +56,13 @@ private:
   void handleConnected(Conn *conn);
   void handleFailed(Conn *conn, const Event &event);
   void handleHello(Conn *conn);
+  void fail(Conn *conn, const std::string &reason);
   void removeConn(Conn *conn);
 
   static constexpr double kHelloTimeout = 10.0;
 
   IEventQueue *m_events;
+  aether::transfer::TransferHub &m_hub;
   std::unique_ptr<ISocketFactory> m_socketFactory;
   NetworkAddress m_serverAddress;
   SecurityLevel m_securityLevel;

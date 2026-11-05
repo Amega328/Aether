@@ -56,6 +56,9 @@ void blockSigpipeOnThisThread()
 void configureBlocking(SocketBulkChannel::NativeSocket socket)
 {
 #if defined(_WIN32)
+  // The multiplexer's event selection forces non-blocking mode, and ioctlsocket
+  // cannot clear it until that association is cancelled.
+  WSAEventSelect(socket, nullptr, 0);
   u_long nonBlocking = 0;
   ioctlsocket(socket, FIONBIO, &nonBlocking);
 

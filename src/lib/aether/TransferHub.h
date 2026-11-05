@@ -22,6 +22,10 @@
 #include <thread>
 #include <vector>
 
+namespace aether {
+class IStream;
+}
+
 namespace aether::transfer {
 
 //! Direction of a data connection, named after what the dialing client does.
@@ -104,6 +108,16 @@ public:
 
   //! Run one data connection. Takes ownership of the channel.
   void serve(std::unique_ptr<BulkChannel> channel, const StreamRequest &request, Side side);
+
+  //! A data connection could not be opened; a pull it belonged to fails so a later request retries.
+  void streamFailed(const StreamRequest &request, const std::string &reason);
+
+  //! Take the socket under a finished handshake (a StreamFilter over an IDataSocket) and serve it.
+  /*!
+  Call from the event loop thread once the handshake has consumed all input.
+  The stream and socket objects stay with the caller, emptied; delete them as usual.
+  */
+  bool serveConnection(IStream *stream, const StreamRequest &request, Side side);
 
   //! Cancel everything and wait for the workers. The hub stays usable afterwards.
   void shutdown();

@@ -24,8 +24,6 @@
 #include "server/ClientProxy1_7.h"
 #include "server/ClientProxy1_8.h"
 #include "aether/TransferHub.h"
-#include "io/StreamFilter.h"
-#include "net/IDataSocket.h"
 #include "server/PortForwardSession.h"
 #include "server/Server.h"
 
@@ -268,16 +266,15 @@ void ClientProxyUnknown::handleData()
       }
 
       removeTimer();
-      const auto *filter = dynamic_cast<StreamFilter *>(m_stream);
-      auto *socket = filter ? dynamic_cast<IDataSocket *>(filter->getStream()) : nullptr;
-      auto channel = socket ? socket->detachBulkChannel() : nullptr;
-      if (!channel) {
+      if (!aether::transfer::TransferHub::instance().serveConnection(
+              m_stream, *request, aether::transfer::Side::Server
+          )) {
         LOG_WARN("could not take over the file transfer connection");
         sendFailure();
         return;
       }
 
-      aether::transfer::TransferHub::instance().serve(std::move(channel), *request, aether::transfer::Side::Server);
+      LOG_DEBUG("serving file transfer stream %u of %u", request->index + 1, request->count);
       // nothing else uses this connection now; let the listener discard the placeholder
       sendFailure();
       return;

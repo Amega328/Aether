@@ -8,6 +8,8 @@
 
 #include "aether/ProtocolTypes.h"
 #include "base/Log.h"
+#include "io/StreamFilter.h"
+#include "net/IDataSocket.h"
 
 #include <QStandardPaths>
 #include <QString>
@@ -431,6 +433,28 @@ void TransferHub::serve(std::unique_ptr<BulkChannel> channel, const StreamReques
 {
   std::shared_ptr<BulkChannel> shared = std::move(channel);
   spawn([this, shared = std::move(shared), request, side] { runStream(shared, request, side); });
+}
+
+void TransferHub::streamFailed(const StreamRequest &request, const std::string &reason)
+{
+  if (request.role != Role::Pull) {
+    return;
+  }
+  if (const auto session = findSession(request.token)) {
+    session->fail("data connection failed: " + reason);
+  }
+}
+
+bool TransferHub::serveConnection(IStream *stream, const StreamRequest &request, Side side)
+{
+  const auto *filter = dynamic_cast<StreamFilter *>(stream);
+  auto *socket = dynamic_cast<IDataSocket *>(filter != nullptr ? filter->getStream() : stream);
+  auto channel = socket != nullptr ? socket->detachBulkChannel() : nullptr;
+  if (!channel) {
+    return false;
+  }
+  serve(std::move(channel), request, side);
+  return true;
 }
 
 void TransferHub::runStream(std::shared_ptr<BulkChannel> channel, StreamRequest request, Side side)
