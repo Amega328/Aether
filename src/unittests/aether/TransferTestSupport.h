@@ -33,7 +33,7 @@ public:
       if (m_closed) {
         throw BulkChannelError("pipe closed");
       }
-      const size_t take = std::min(n, kCapacity - m_data.size());
+      const size_t take = (std::min)(n, kCapacity - m_data.size());
       m_data.append(data, take);
       data += take;
       n -= take;
@@ -51,7 +51,7 @@ public:
     if (m_data.empty()) {
       return 0;
     }
-    const size_t take = std::min(n, m_data.size());
+    const size_t take = (std::min)(n, m_data.size());
     std::memcpy(out, m_data.data(), take);
     m_data.erase(0, take);
     m_space.notify_all();
@@ -139,7 +139,7 @@ inline void writePatternFile(const fs::path &path, uint64_t size, uint32_t seed)
   std::ofstream file(path, std::ios::binary | std::ios::trunc);
   std::string block(1 << 20, '\0');
   for (uint64_t done = 0; done < size;) {
-    const auto chunk = static_cast<size_t>(std::min<uint64_t>(block.size(), size - done));
+    const auto chunk = static_cast<size_t>((std::min<uint64_t>)(block.size(), size - done));
     for (size_t i = 0; i < chunk; ++i) {
       block[i] = static_cast<char>(patternByte(done + i, seed));
     }

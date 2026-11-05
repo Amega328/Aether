@@ -167,7 +167,7 @@ void BulkChannelTests::tlsLargeTransfer()
 
   std::string received(data.size(), '\0');
   for (size_t got = 0; got < received.size();) {
-    const size_t chunk = std::min<size_t>(1024 * 1024, received.size() - got);
+    const size_t chunk = (std::min<size_t>)(1024 * 1024, received.size() - got);
     b->readFully(received.data() + got, chunk);
     got += chunk;
   }

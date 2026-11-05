@@ -375,7 +375,7 @@ std::string aether::clipboard::offerFiles(const std::vector<std::filesystem::pat
     if (source.manifest.entries.empty())
       return {};
 
-    if (source.manifest.totalBytes() <= std::min(inlineLimit, kInlineBytes))
+    if (source.manifest.totalBytes() <= (std::min)(inlineLimit, kInlineBytes))
       return packFiles(paths);
 
     LOG_DEBUG(

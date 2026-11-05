@@ -388,7 +388,7 @@ std::vector<Unit> layoutUnits(const Manifest &manifest)
       continue;
     }
     for (uint64_t offset = 0; offset < entry.size; offset += kUnitBytes) {
-      units.push_back({static_cast<uint32_t>(i), offset, std::min(kUnitBytes, entry.size - offset)});
+      units.push_back({static_cast<uint32_t>(i), offset, (std::min)(kUnitBytes, entry.size - offset)});
     }
   }
   return units;
@@ -427,7 +427,7 @@ unsigned plannedStreams(const Manifest &manifest)
 {
   const auto units = layoutUnits(manifest).size();
   return static_cast<unsigned>(
-      std::clamp<size_t>(streamCountFor(manifest.totalBytes()), 1, std::max<size_t>(1, units))
+      std::clamp<size_t>(streamCountFor(manifest.totalBytes()), 1, (std::max<size_t>)(1, units))
   );
 }
 
@@ -449,16 +449,35 @@ std::vector<std::string> topLevelNames(const Manifest &manifest)
   return names;
 }
 
-int64_t toUnixSeconds(fs::file_time_type time)
+namespace {
+
+// libc++ lacks std::chrono::clock_cast, so convert with a fixed offset between the two clocks,
+// sampled once so that to/from conversions round-trip exactly.
+std::chrono::system_clock::duration fileClockOffset()
 {
-  const auto system = std::chrono::clock_cast<std::chrono::system_clock>(time);
-  return std::chrono::duration_cast<std::chrono::seconds>(system.time_since_epoch()).count();
+  static const auto offset = [] {
+    using namespace std::chrono;
+    const auto fileNow = fs::file_time_type::clock::now();
+    const auto systemNow = system_clock::now();
+    return systemNow.time_since_epoch() - duration_cast<system_clock::duration>(fileNow.time_since_epoch());
+  }();
+  return offset;
 }
 
-fs::file_time_type fromUnixSeconds(int64_t seconds)
+} // namespace
+
+int64_t toUnixSeconds(fs::file_time_type time)
 {
-  const std::chrono::system_clock::time_point system{std::chrono::seconds(seconds)};
-  return std::chrono::clock_cast<fs::file_time_type::clock>(system);
+  using namespace std::chrono;
+  const auto sinceEpoch = duration_cast<system_clock::duration>(time.time_since_epoch()) + fileClockOffset();
+  return duration_cast<seconds>(sinceEpoch).count();
+}
+
+fs::file_time_type fromUnixSeconds(int64_t secondsSinceEpoch)
+{
+  using namespace std::chrono;
+  const auto sinceFileEpoch = seconds(secondsSinceEpoch) - fileClockOffset();
+  return fs::file_time_type(duration_cast<fs::file_time_type::duration>(sinceFileEpoch));
 }
 
 } // namespace aether::transfer

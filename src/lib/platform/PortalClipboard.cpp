@@ -248,7 +248,7 @@ QByteArray PortalClipboard::decodeFormat(const SupportedMime &entry, const QByte
     }
 
     try {
-      const auto limit = std::min<uint64_t>(static_cast<uint64_t>(maxBytes), aether::clipboard::kMaxPackBytes);
+      const auto limit = (std::min<uint64_t>)(static_cast<uint64_t>(maxBytes), aether::clipboard::kMaxPackBytes);
       return QByteArray::fromStdString(aether::clipboard::offerFiles(paths, limit));
     } catch (const std::exception &e) {
       LOG_WARN("failed to pack clipboard files: %s", e.what());
@@ -292,13 +292,13 @@ QByteArray PortalClipboard::readSelectionBytes(XdpSession *session, const char *
   }
 
   QByteArray contents;
-  contents.reserve(std::min<qint64>(maxBytes, kChunkBytes));
+  contents.reserve((std::min<qint64>)(maxBytes, kChunkBytes));
   while (contents.size() < maxBytes) {
     pollfd pfd{fd, POLLIN, 0};
     if (poll(&pfd, 1, kReadTimeoutMs) <= 0)
       break;
 
-    const auto chunk = pipe.read(std::min<qint64>(kChunkBytes, maxBytes - contents.size()));
+    const auto chunk = pipe.read((std::min<qint64>)(kChunkBytes, maxBytes - contents.size()));
     if (chunk.isEmpty())
       break;
 

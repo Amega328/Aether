@@ -165,7 +165,7 @@ size_t SocketBulkChannel::read(void *buffer, size_t n)
   }
 
   if (m_pendingOffset < m_pending.size()) {
-    const size_t take = std::min(n, m_pending.size() - m_pendingOffset);
+    const size_t take = (std::min)(n, m_pending.size() - m_pendingOffset);
     std::memcpy(buffer, m_pending.data() + m_pendingOffset, take);
     m_pendingOffset += take;
     if (m_pendingOffset == m_pending.size()) {
@@ -175,7 +175,7 @@ size_t SocketBulkChannel::read(void *buffer, size_t n)
     return take;
   }
 
-  const size_t chunk = std::min(n, kMaxIoChunk);
+  const size_t chunk = (std::min)(n, kMaxIoChunk);
   for (;;) {
     if (m_cancelled) {
       throw BulkChannelError("transfer cancelled");
@@ -213,7 +213,7 @@ void SocketBulkChannel::write(const void *buffer, size_t n)
       throw BulkChannelError("transfer cancelled");
     }
 
-    const size_t chunk = std::min(n, kMaxIoChunk);
+    const size_t chunk = (std::min)(n, kMaxIoChunk);
     if (m_ssl != nullptr) {
       ERR_clear_error();
       const int wrote = SSL_write(m_ssl, data, static_cast<int>(chunk));

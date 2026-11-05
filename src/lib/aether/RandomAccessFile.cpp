@@ -73,7 +73,7 @@ size_t RandomAccessFile::readAt(uint64_t offset, void *buffer, size_t n)
     position.OffsetHigh = static_cast<DWORD>(at >> 32);
 
     DWORD got = 0;
-    const auto want = static_cast<DWORD>(std::min(n - total, kMaxIoBytes));
+    const auto want = static_cast<DWORD>((std::min)(n - total, kMaxIoBytes));
     if (!ReadFile(m_handle, out + total, want, &got, &position)) {
       if (GetLastError() == ERROR_HANDLE_EOF) {
         break;
@@ -99,7 +99,7 @@ void RandomAccessFile::writeAt(uint64_t offset, const void *buffer, size_t n)
     position.OffsetHigh = static_cast<DWORD>(at >> 32);
 
     DWORD wrote = 0;
-    const auto want = static_cast<DWORD>(std::min(n - total, kMaxIoBytes));
+    const auto want = static_cast<DWORD>((std::min)(n - total, kMaxIoBytes));
     if (!WriteFile(m_handle, in + total, want, &wrote, &position) || wrote == 0) {
       throw TransferError("cannot write " + m_path.string() + ": " + describeError());
     }
@@ -145,7 +145,7 @@ size_t RandomAccessFile::readAt(uint64_t offset, void *buffer, size_t n)
   size_t total = 0;
   while (total < n) {
     const ssize_t got =
-        ::pread(m_fd, out + total, std::min(n - total, kMaxIoBytes), static_cast<off_t>(offset + total));
+        ::pread(m_fd, out + total, (std::min)(n - total, kMaxIoBytes), static_cast<off_t>(offset + total));
     if (got < 0) {
       if (errno == EINTR) {
         continue;
@@ -166,7 +166,7 @@ void RandomAccessFile::writeAt(uint64_t offset, const void *buffer, size_t n)
   size_t total = 0;
   while (total < n) {
     const ssize_t wrote =
-        ::pwrite(m_fd, in + total, std::min(n - total, kMaxIoBytes), static_cast<off_t>(offset + total));
+        ::pwrite(m_fd, in + total, (std::min)(n - total, kMaxIoBytes), static_cast<off_t>(offset + total));
     if (wrote < 0) {
       if (errno == EINTR) {
         continue;

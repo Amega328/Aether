@@ -104,7 +104,7 @@ void sendStream(
     }
 
     for (uint64_t done = 0; done < unit.length;) {
-      const auto chunk = static_cast<size_t>(std::min<uint64_t>(buffer.size(), unit.length - done));
+      const auto chunk = static_cast<size_t>((std::min<uint64_t>)(buffer.size(), unit.length - done));
       if (file->readAt(unit.offset + done, buffer.data(), chunk) != chunk) {
         throw TransferError("file changed while sending: " + manifest.entries[unit.entry].name);
       }
@@ -254,7 +254,7 @@ void ReceiveSession::receive(BulkChannel &channel, unsigned index, unsigned coun
       }
 
       for (uint64_t done = 0; done < unit.length;) {
-        const auto chunk = static_cast<size_t>(std::min<uint64_t>(buffer.size(), unit.length - done));
+        const auto chunk = static_cast<size_t>((std::min<uint64_t>)(buffer.size(), unit.length - done));
         channel.readFully(buffer.data(), chunk);
         file->writeAt(unit.offset + done, buffer.data(), chunk);
         done += chunk;
