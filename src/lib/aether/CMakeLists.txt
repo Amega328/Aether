@@ -72,6 +72,8 @@ add_library(${lib_name} STATIC ${PLATFORM_CODE}
   ProtocolTypes.h
   ProtocolUtil.cpp
   ProtocolUtil.h
+  RandomAccessFile.cpp
+  RandomAccessFile.h
   Screen.cpp
   Screen.h
   ScreenException.cpp
@@ -82,6 +84,13 @@ add_library(${lib_name} STATIC ${PLATFORM_CODE}
   StreamChunker.h
   StreamPump.cpp
   StreamPump.h
+  TransferHub.cpp
+  TransferHub.h
+  TransferManifest.cpp
+  TransferManifest.h
+  TransferStream.cpp
+  TransferStream.h
+  TransferWire.h
   KeyboardLayoutManager.cpp
   KeyboardLayoutManager.h
   ipc/IpcServer.cpp

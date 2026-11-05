@@ -151,6 +151,20 @@ static constexpr uint32_t PROTOCOL_MAX_STRING_LENGTH = 1024 * 1024;
  */
 extern const char *const kPortShareNamePrefix;
 
+/**
+ * @brief Client-name prefix marking a large file transfer data connection
+ *
+ * Files too big for the clipboard travel on dedicated connections. Each one
+ * opens with a normal hello-back whose client name is this prefix followed by
+ * `<pull|push>:<token>:<stream index>:<stream count>`, for example
+ * `aetherxfer:pull:00112233445566778899aabbccddeeff:0:4`. After the hello the
+ * connection carries raw transfer data instead of protocol messages; see
+ * TransferStream.h.
+ *
+ * @since Protocol version 1.8
+ */
+extern const char *const kTransferNamePrefix;
+
 /** @} */ // end of protocol_constants group
 
 /**

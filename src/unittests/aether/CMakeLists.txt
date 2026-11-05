@@ -30,6 +30,22 @@ create_test(
 )
 
 create_test(
+  NAME TransferHubTests
+  DEPENDS app
+  LIBS arch base io net ${extra_libs}
+  SOURCE TransferHubTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/aether"
+)
+
+create_test(
+  NAME TransferTests
+  DEPENDS app
+  LIBS arch base io net ${extra_libs}
+  SOURCE TransferTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/aether"
+)
+
+create_test(
   NAME StreamPumpTests
   DEPENDS app
   LIBS arch base io ${extra_libs}
