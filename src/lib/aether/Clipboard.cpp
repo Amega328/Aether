@@ -131,3 +131,30 @@ std::optional<std::string> aether::clipboard::readFilesPayload(const IClipboard 
   clipboard.close();
   return files;
 }
+
+void aether::clipboard::copyFormats(const IClipboard &src, IClipboard &dst, bool textOnly)
+{
+  if (!src.open(0)) {
+    return;
+  }
+  const auto time = src.getTime();
+  if (dst.open(time)) {
+    dst.empty();
+    for (int i = 0; i < static_cast<int>(IClipboard::Format::TotalFormats); ++i) {
+      const auto format = static_cast<IClipboard::Format>(i);
+      if (textOnly && format != IClipboard::Format::Text && format != IClipboard::Format::HTML) {
+        continue;
+      }
+      if (!src.has(format)) {
+        continue;
+      }
+      auto data = src.get(format);
+      if (format == IClipboard::Format::Files && data.empty()) {
+        continue;
+      }
+      dst.add(format, std::move(data));
+    }
+    dst.close();
+  }
+  src.close();
+}

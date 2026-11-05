@@ -12,7 +12,9 @@
 #include "platform/MSWindowsHook.h"
 #include "platform/MSWindowsPowerManager.h"
 
+#include <atomic>
 #include <map>
+#include <memory>
 #include <string>
 
 #define WIN32_LEAN_AND_MEAN
@@ -22,6 +24,7 @@ class EventQueueTimer;
 class MSWindowsDesks;
 class MSWindowsKeyState;
 class MSWindowsScreenSaver;
+class Clipboard;
 class Thread;
 class MSWindowsDropTarget;
 
@@ -303,6 +306,11 @@ private:
   HWND m_window = nullptr;
   DWORD m_clipboardSequenceNumber = 0;
   bool m_ownClipboard = false;
+
+  // last read of the Windows clipboard, reused until its sequence number changes
+  mutable std::unique_ptr<Clipboard> m_clipboardSnapshot;
+  mutable DWORD m_clipboardSnapshotSequence = 0;
+  mutable std::atomic<bool> m_clipboardSnapshotStale = false;
 
   // one desk per desktop and a cond var to communicate with it
   MSWindowsDesks *m_desks = nullptr;

@@ -29,6 +29,8 @@ add_library(${lib_name} STATIC ${PLATFORM_CODE}
   App.h
   AppUtil.cpp
   AppUtil.h
+  BackgroundFilesOffer.cpp
+  BackgroundFilesOffer.h
   Chunk.cpp
   Chunk.h
   ClientApp.cpp

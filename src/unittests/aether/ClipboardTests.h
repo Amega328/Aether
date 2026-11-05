@@ -25,6 +25,8 @@ private Q_SLOTS:
   void unMarshalTextAndHtml();
   void equalClipboards();
   void filesPayloadOnClosedClipboard();
+  void copyFormatsForSelection();
+  void copyFormatsSkipsPendingFiles();
 
 private:
   const std::string kTestString1 = "aether rocks";

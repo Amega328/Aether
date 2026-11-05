@@ -255,4 +255,50 @@ void ClipboardTests::filesPayloadOnClosedClipboard()
   withFiles.close();
 }
 
+void ClipboardTests::copyFormatsForSelection()
+{
+  Clipboard source;
+  source.open(42);
+  source.add(IClipboard::Format::Text, kTestString1);
+  source.add(IClipboard::Format::HTML, "<b>x</b>");
+  source.add(IClipboard::Format::Bitmap, std::string(1000, 'b'));
+  source.add(IClipboard::Format::Files, "manifest");
+  source.close();
+
+  Clipboard full;
+  aether::clipboard::copyFormats(source, full);
+  QCOMPARE(full.marshall(), source.marshall());
+  QCOMPARE(full.getTime(), source.getTime());
+
+  // The selection carries no second copy of the image or the file list.
+  Clipboard selection;
+  aether::clipboard::copyFormats(source, selection, true);
+  selection.open(0);
+  QVERIFY(selection.has(IClipboard::Format::Text));
+  QVERIFY(selection.has(IClipboard::Format::HTML));
+  QVERIFY(!selection.has(IClipboard::Format::Bitmap));
+  QVERIFY(!selection.has(IClipboard::Format::Files));
+  selection.close();
+}
+
+void ClipboardTests::copyFormatsSkipsPendingFiles()
+{
+  Clipboard source;
+  source.open(0);
+  source.add(IClipboard::Format::Text, kTestString1);
+  source.add(IClipboard::Format::Files, "");
+  source.close();
+
+  Clipboard copy;
+  aether::clipboard::copyFormats(source, copy);
+  QVERIFY(!aether::clipboard::readFilesPayload(copy).has_value());
+  copy.open(0);
+  QCOMPARE(copy.get(IClipboard::Format::Text), std::string(kTestString1));
+  copy.close();
+
+  // Both clipboards are closed again for the next reader.
+  QVERIFY(source.open(0));
+  source.close();
+}
+
 QTEST_MAIN(ClipboardTests)

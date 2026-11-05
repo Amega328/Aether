@@ -74,4 +74,13 @@ Call it on a closed clipboard.
 */
 std::optional<std::string> readFilesPayload(const IClipboard &clipboard);
 
+//! Copy the formats of \c src into \c dst, keeping \c src's time.
+/*!
+An empty Files payload (a selection still being listed) is left out. With
+\c textOnly only Text and HTML are copied: what a primary selection, which
+Windows does not have, should carry instead of a second copy of big images
+and file lists. Both clipboards must be closed.
+*/
+void copyFormats(const IClipboard &src, IClipboard &dst, bool textOnly = false);
+
 } // namespace aether::clipboard

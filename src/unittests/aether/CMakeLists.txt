@@ -30,6 +30,14 @@ create_test(
 )
 
 create_test(
+  NAME BackgroundFilesOfferTests
+  DEPENDS app
+  LIBS arch base io net ${extra_libs}
+  SOURCE BackgroundFilesOfferTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/aether"
+)
+
+create_test(
   NAME TransferHubTests
   DEPENDS app
   LIBS arch base io net ${extra_libs}

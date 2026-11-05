@@ -100,7 +100,7 @@ int64_t modifiedSeconds(const fs::path &path)
   return ec ? 0 : toUnixSeconds(time);
 }
 
-void addEntry(Source &source, std::string name, const fs::path &path, bool directory, uint64_t size)
+void addEntry(Source &source, std::string name, const fs::path &path, bool directory, uint64_t size, int64_t modified)
 {
   if (!aether::clipboard::isSafeEntryName(name)) {
     throw TransferError("unsupported file name: " + name);
@@ -112,7 +112,7 @@ void addEntry(Source &source, std::string name, const fs::path &path, bool direc
   Entry entry;
   entry.name = std::move(name);
   entry.size = directory ? 0 : size;
-  entry.modified = modifiedSeconds(path);
+  entry.modified = modified;
   entry.directory = directory;
   source.manifest.entries.push_back(std::move(entry));
   source.paths.push_back(path);
@@ -136,20 +136,25 @@ void addTree(Source &source, const fs::path &root, const std::string &rootName)
       continue;
     }
 
-    const auto relative = fs::relative(it->path(), root, statusEc);
-    if (statusEc) {
+    // The iterator yields root/..., so a lexical relative path is exact. fs::relative would
+    // canonicalize both paths, opening files for every entry: minutes on large Windows trees.
+    const auto relative = it->path().lexically_relative(root);
+    if (relative.empty()) {
       throw TransferError("cannot resolve path: " + it->path().string());
     }
     auto name = rootName + "/" + toUtf8(relative);
 
+    // Sizes and times come from the directory listing on Windows; no extra call per file.
+    const auto time = it->last_write_time(statusEc);
+    const int64_t modified = statusEc ? 0 : toUnixSeconds(time);
     if (fs::is_directory(status)) {
-      addEntry(source, std::move(name), it->path(), true, 0);
+      addEntry(source, std::move(name), it->path(), true, 0, modified);
     } else if (fs::is_regular_file(status)) {
       const auto size = it->file_size(statusEc);
       if (statusEc) {
         throw TransferError("cannot size file: " + it->path().string());
       }
-      addEntry(source, std::move(name), it->path(), false, size);
+      addEntry(source, std::move(name), it->path(), false, size, modified);
     }
   }
   if (ec) {
@@ -241,14 +246,14 @@ Source buildSource(const std::vector<fs::path> &paths)
 
     auto name = uniqueTopName(toUtf8(path.filename()), usedTopNames);
     if (directory) {
-      addEntry(source, name, path, true, 0);
+      addEntry(source, name, path, true, 0, modifiedSeconds(path));
       addTree(source, path, name);
     } else {
       const auto size = fs::file_size(path, ec);
       if (ec) {
         throw TransferError("cannot size file: " + path.string());
       }
-      addEntry(source, std::move(name), path, false, size);
+      addEntry(source, std::move(name), path, false, size, modifiedSeconds(path));
     }
   }
 

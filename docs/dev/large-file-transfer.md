@@ -17,6 +17,14 @@ Replaces packing file contents into the clipboard (limited by memory, by
    the files and returns a *manifest* (names, sizes, mtimes, a token). Files
    that a finished transfer staged map back to their original manifest, so
    re-reading the clipboard never starts a new transfer.
+   On Windows the clipboard is read on the event thread, which also serves the
+   mouse hook and keep-alives, while listing a big folder takes seconds. So the
+   converter goes through `BackgroundFilesOffer`: it waits up to 200 ms, and if
+   the listing is not done the clipboard goes out without files, and the screen
+   re-announces it (a `ClipboardGrabbed`) when the listing finishes.
+   `MSWindowsScreen` also keeps the last read until the Windows clipboard
+   sequence number changes, and gives the selection (clipboard 1) only text,
+   so a screen switch neither re-lists the files nor sends them twice.
 2. The manifest syncs like any clipboard (a few KB, so `clipboardSize` no
    longer matters). `Screen::setClipboard` intercepts it, calls
    `TransferHub::request`, and leaves the system clipboard alone until the
@@ -62,7 +70,9 @@ else 4 (never more than the number of units).
   server has not finished receiving them yet; retry after it completes.
 - Names that Windows cannot hold (`: ? * < > | \`) still reject the selection.
 - A folder's manifest must still fit `clipboardSize` (about 100 bytes per file
-  before compression).
+  before compression; 88k files came to 1 MB).
+- A data connection fails after 30 s without progress, which a receiver
+  creating a very large number of files on a slow disk could hit.
 - No GUI progress yet; start, finish and speed are logged at INFO.
 - X11 clients are not covered (same as the inline path).
 
@@ -71,4 +81,6 @@ else 4 (never more than the number of units).
 `TransferTests` (manifest, layout, streams, multi-stream, failures, opt-in TLS
 benchmark via `AETHER_TRANSFER_BENCH_MB`), `TransferHubTests` (pull, push, relay,
 retry, eviction, shutdown over in-memory pipes), `BulkChannelTests` (plain and
-TLS channels, cancellation, detaching live `TCPSocket`s).
+TLS channels, cancellation, detaching live `TCPSocket`s), `TransferConnectorTests`
+(pull and push through the real connector and server handshake over TCP and TLS,
+hang-ups and refused dials), `BackgroundFilesOfferTests` (deferred listing).

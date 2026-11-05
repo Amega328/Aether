@@ -21,6 +21,7 @@ private Q_SLOTS:
   void manifestRejectsMalformed();
   void tokenIsStableAndDistinct();
   void topLevelNameClashesAreMadeUnique();
+  void buildSourceListsNestedTree();
   void unitsCoverEveryByteOnce();
   void streamCountPolicy();
 

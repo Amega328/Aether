@@ -18,6 +18,7 @@
 #include "common/Constants.h"
 #include "common/Settings.h"
 #include "aether/App.h"
+#include "aether/BackgroundFilesOffer.h"
 #include "aether/ClientApp.h"
 #include "aether/Clipboard.h"
 #include "aether/KeyMap.h"
@@ -134,6 +135,14 @@ MSWindowsScreen::MSWindowsScreen(bool isPrimary, bool useHooks, IEventQueue *eve
     handleSystemEvent(e);
   });
 
+  // A big copied folder is listed in the background; once it is, read the clipboard
+  // again and announce it, as if it had just changed. Runs on the worker thread.
+  aether::clipboard::BackgroundFilesOffer::shared().setReadyCallback([this] {
+    LOG_DEBUG("copied files are listed, announcing the clipboard again");
+    m_clipboardSnapshotStale = true;
+    sendClipboardEvent(EventTypes::ClipboardGrabbed, kClipboardClipboard);
+  });
+
   // install the platform event queue
   m_events->adoptBuffer(new MSWindowsEventQueueBuffer(m_events));
 }
@@ -142,7 +151,13 @@ MSWindowsScreen::~MSWindowsScreen()
 {
   assert(s_screen != nullptr);
 
-  disable();
+  aether::clipboard::BackgroundFilesOffer::shared().shutdown();
+
+  // Screen::disable() normally got here first; a second disable() would unregister the
+  // clipboard listener twice (error 87).
+  if (m_isEnabled) {
+    disable();
+  }
   m_events->adoptBuffer(nullptr);
   m_events->removeHandler(EventTypes::System, m_events->getSystemTarget());
   delete m_keyState;
@@ -416,10 +431,22 @@ void *MSWindowsScreen::getEventTarget() const
   return const_cast<MSWindowsScreen *>(this);
 }
 
-bool MSWindowsScreen::getClipboard(ClipboardID, IClipboard *dst) const
+bool MSWindowsScreen::getClipboard(ClipboardID id, IClipboard *dst) const
 {
-  MSWindowsClipboard src(m_window);
-  Clipboard::copy(dst, &src);
+  // Reading the Windows clipboard converts every format and lists copied files, and the
+  // server asks for the clipboard and the selection on every screen switch: read it once per change.
+  const DWORD sequence = GetClipboardSequenceNumber();
+  const bool stale = m_clipboardSnapshotStale.exchange(false);
+  if (m_clipboardSnapshot == nullptr || sequence != m_clipboardSnapshotSequence || stale) {
+    auto snapshot = std::make_unique<Clipboard>();
+    MSWindowsClipboard src(m_window);
+    Clipboard::copy(snapshot.get(), &src);
+    m_clipboardSnapshot = std::move(snapshot);
+    m_clipboardSnapshotSequence = sequence;
+  }
+
+  // Windows has no selection; give it the text only rather than a second copy of images and files.
+  aether::clipboard::copyFormats(*m_clipboardSnapshot, *dst, id == kClipboardSelection);
   return true;
 }
 
@@ -667,13 +694,9 @@ int32_t MSWindowsScreen::getJumpZoneSize() const
 
 bool MSWindowsScreen::isAnyMouseButtonDown(uint32_t &buttonID) const
 {
-  static const char *buttonToName[] = {"<invalid>",    "Left Button", "Middle Button",
-                                       "Right Button", "X Button 1",  "X Button 2"};
-
   for (uint32_t i = 1; i < sizeof(m_buttons) / sizeof(m_buttons[0]); ++i) {
     if (m_buttons[i]) {
       buttonID = i;
-      LOG_DEBUG("locked by \"%s\"", buttonToName[i]);
       return true;
     }
   }

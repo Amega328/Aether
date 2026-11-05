@@ -13,6 +13,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <fstream>
+#include <map>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -229,6 +230,47 @@ void TransferTests::topLevelNameClashesAreMadeUnique()
   QCOMPARE(source.manifest.entries[0].name, std::string("report.txt"));
   QCOMPARE(source.manifest.entries[1].name, std::string("report (2).txt"));
   QCOMPARE(source.manifest.entries[2].name, std::string("report (3).txt"));
+}
+
+void TransferTests::buildSourceListsNestedTree()
+{
+  const auto root = testRoot(m_dir, "tree");
+  writePatternFile(root / "photos" / "a.jpg", 10, 1);
+  writePatternFile(root / "photos" / "2026" / "b.jpg", 20, 2);
+  writePatternFile(root / "photos" / "2026" / "deep" / "c.jpg", 30, 3);
+  fs::create_directories(root / "photos" / "empty");
+
+  // Distinct times per entry, so a time taken from the wrong file shows up.
+  int64_t stamp = 1'700'000'000;
+  std::map<std::string, int64_t> expectedTimes;
+  for (const auto *name :
+       {"photos/2026/deep/c.jpg", "photos/2026/deep", "photos/2026/b.jpg", "photos/2026", "photos/a.jpg",
+        "photos/empty", "photos"}) {
+    stamp += 3600;
+    fs::last_write_time(root / name, fromUnixSeconds(stamp));
+    expectedTimes[name] = stamp;
+  }
+
+  // A trailing separator must not change the names.
+  const auto source = buildSource({root / "photos" / ""});
+  std::map<std::string, Entry> byName;
+  for (const auto &entry : source.manifest.entries) {
+    byName[entry.name] = entry;
+  }
+
+  QCOMPARE(byName.size(), expectedTimes.size());
+  for (const auto &[name, time] : expectedTimes) {
+    QVERIFY2(byName.contains(name), name.c_str());
+    QCOMPARE(byName[name].modified, time);
+  }
+  QVERIFY(byName["photos"].directory);
+  QVERIFY(byName["photos/empty"].directory);
+  QCOMPARE(byName["photos/2026/deep/c.jpg"].size, uint64_t{30});
+  QCOMPARE(source.manifest.totalBytes(), uint64_t{60});
+  QCOMPARE(source.paths.size(), source.manifest.entries.size());
+  for (size_t i = 0; i < source.paths.size(); ++i) {
+    QVERIFY(fs::equivalent(source.paths[i], root / fs::path(source.manifest.entries[i].name)));
+  }
 }
 
 void TransferTests::unitsCoverEveryByteOnce()

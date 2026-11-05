@@ -6,6 +6,7 @@
 
 #include "platform/MSWindowsClipboardFilesConverter.h"
 
+#include "aether/BackgroundFilesOffer.h"
 #include "aether/ClipboardFiles.h"
 #include "base/Log.h"
 
@@ -112,7 +113,9 @@ std::string MSWindowsClipboardFilesConverter::toIClipboard(HANDLE data) const
   GlobalUnlock(data);
 
   try {
-    return aether::clipboard::offerFiles(paths);
+    // Listing a big folder takes seconds; never hold the event thread for it. Until the
+    // listing is done the clipboard goes out without files, then MSWindowsScreen re-announces it.
+    return aether::clipboard::BackgroundFilesOffer::shared().offer(paths, GetClipboardSequenceNumber()).value_or("");
   } catch (const std::exception &e) {
     LOG_WARN("failed to pack clipboard files: %s", e.what());
     return {};
