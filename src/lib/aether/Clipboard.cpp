@@ -117,3 +117,17 @@ std::string Clipboard::marshall() const
 {
   return IClipboard::marshall(this);
 }
+
+std::optional<std::string> aether::clipboard::readFilesPayload(const IClipboard &clipboard)
+{
+  if (!clipboard.open(0)) {
+    return std::nullopt;
+  }
+
+  std::optional<std::string> files;
+  if (clipboard.has(IClipboard::Format::Files)) {
+    files = clipboard.get(IClipboard::Format::Files);
+  }
+  clipboard.close();
+  return files;
+}

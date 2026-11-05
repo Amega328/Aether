@@ -24,6 +24,7 @@ private Q_SLOTS:
   void unMarshalLongerText();
   void unMarshalTextAndHtml();
   void equalClipboards();
+  void filesPayloadOnClosedClipboard();
 
 private:
   const std::string kTestString1 = "aether rocks";

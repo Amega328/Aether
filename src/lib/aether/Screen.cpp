@@ -9,6 +9,7 @@
 #include "base/IEventQueue.h"
 #include "base/Log.h"
 #include "aether/IPlatformScreen.h"
+#include "aether/Clipboard.h"
 #include "aether/ClipboardFiles.h"
 #include "aether/TransferHub.h"
 
@@ -47,11 +48,15 @@ std::unique_ptr<Clipboard> copyClipboard(const IClipboard &in, const std::string
   auto copy = std::make_unique<Clipboard>();
   copy->open(0);
   copy->empty();
-  for (int format = 0; format < static_cast<int>(IClipboard::Format::TotalFormats); ++format) {
+  const bool opened = in.open(0);
+  for (int format = 0; format < static_cast<int>(IClipboard::Format::TotalFormats) && opened; ++format) {
     const auto type = static_cast<IClipboard::Format>(format);
     if (type != IClipboard::Format::Files && in.has(type)) {
       copy->add(type, in.get(type));
     }
+  }
+  if (opened) {
+    in.close();
   }
   if (files != nullptr) {
     copy->add(IClipboard::Format::Files, *files);
@@ -242,12 +247,13 @@ void Screen::setClipboard(ClipboardID id, const IClipboard *clipboard)
 {
   m_pendingFiles[id] = {};
 
-  if (clipboard == nullptr || !clipboard->has(IClipboard::Format::Files)) {
+  const auto payload = clipboard == nullptr ? std::nullopt : aether::clipboard::readFilesPayload(*clipboard);
+  if (!payload) {
     m_screen->setClipboard(id, clipboard);
     return;
   }
 
-  const auto files = clipboard->get(IClipboard::Format::Files);
+  const auto &files = *payload;
 
   // Staged-path payloads only ever come from this machine; never trust one from a peer.
   if (aether::clipboard::isLocalPathsPayload(files)) {

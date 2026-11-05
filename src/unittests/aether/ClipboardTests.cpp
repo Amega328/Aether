@@ -230,4 +230,29 @@ void ClipboardTests::equalClipboards()
   clipboard2.close();
 }
 
+void ClipboardTests::filesPayloadOnClosedClipboard()
+{
+  const std::string payload = "payload bytes";
+
+  Clipboard withFiles;
+  withFiles.open(0);
+  withFiles.add(IClipboard::Format::Files, payload);
+  withFiles.close();
+
+  // The clipboard is closed here, as it is after unmarshalling; a plain has() would say no.
+  const auto read = aether::clipboard::readFilesPayload(withFiles);
+  QVERIFY(read.has_value());
+  QCOMPARE(*read, payload);
+
+  Clipboard textOnly;
+  textOnly.open(0);
+  textOnly.add(IClipboard::Format::Text, kTestString1);
+  textOnly.close();
+  QVERIFY(!aether::clipboard::readFilesPayload(textOnly).has_value());
+
+  // Reading must leave the clipboard closed so the next reader can open it.
+  QVERIFY(withFiles.open(0));
+  withFiles.close();
+}
+
 QTEST_MAIN(ClipboardTests)

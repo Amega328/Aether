@@ -408,14 +408,12 @@ void Client::sendClipboard(ClipboardID id)
       m_dataClipboard[id] = data;
       m_server->onClipboardChanged(id, &clipboard);
 
-      if (clipboard.has(IClipboard::Format::Files)) {
-        const auto files = clipboard.get(IClipboard::Format::Files);
-        if (aether::transfer::isManifestPayload(files)) {
-          try {
-            aether::transfer::TransferHub::instance().announceSent(aether::transfer::decodeManifest(files));
-          } catch (const std::exception &e) {
-            LOG_WARN("not sending files to the server: %s", e.what());
-          }
+      if (const auto files = aether::clipboard::readFilesPayload(clipboard);
+          files && aether::transfer::isManifestPayload(*files)) {
+        try {
+          aether::transfer::TransferHub::instance().announceSent(aether::transfer::decodeManifest(*files));
+        } catch (const std::exception &e) {
+          LOG_WARN("not sending files to the server: %s", e.what());
         }
       }
     }

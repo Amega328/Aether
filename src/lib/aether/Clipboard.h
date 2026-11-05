@@ -10,6 +10,8 @@
 #include "aether/IClipboard.h"
 
 #include <mutex>
+#include <optional>
+#include <string>
 
 //! Memory buffer clipboard
 /*!
@@ -62,3 +64,14 @@ private:
   bool m_added[static_cast<int>(Format::TotalFormats)] = {false, false, false};
   std::string m_data[static_cast<int>(Format::TotalFormats)] = {"", "", ""};
 };
+
+namespace aether::clipboard {
+
+//! The Files payload of \c clipboard, if it holds one.
+/*!
+Clipboards must be open to be read, so this opens \c clipboard for the duration of the call.
+Call it on a closed clipboard.
+*/
+std::optional<std::string> readFilesPayload(const IClipboard &clipboard);
+
+} // namespace aether::clipboard
