@@ -44,3 +44,19 @@ create_test(
   SOURCE EventQueueTests.cpp
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/base"
 )
+
+create_test(
+  NAME ChangeDetectorTests
+  DEPENDS base
+  LIBS arch
+  SOURCE ChangeDetectorTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/base"
+)
+
+create_test(
+  NAME ThreadCancelTests
+  DEPENDS mt
+  LIBS base arch ${extra_libs}
+  SOURCE ThreadCancelTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/base"
+)

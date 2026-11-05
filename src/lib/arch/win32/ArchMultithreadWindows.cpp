@@ -388,11 +388,15 @@ void ArchMultithreadWindows::setPriorityOfThread(ArchThread thread, int n)
 
 void ArchMultithreadWindows::testCancelThread()
 {
-  // find current thread
-  std::scoped_lock lock{m_threadMutex};
-  ArchThreadImpl *thread = findNoRefOrInsert(GetCurrentThreadId());
+  ArchThreadImpl *thread = nullptr;
+  {
+    std::scoped_lock lock{m_threadMutex};
+    thread = findNoRefOrInsert(GetCurrentThreadId());
+  }
 
-  // test cancel on thread
+  // Not under the lock: on a cancelled thread testCancelThreadImpl() takes it again,
+  // and MSVC throws "resource deadlock would occur" instead of unwinding the thread,
+  // which aborted the process when the socket multiplexer was stopped.
   testCancelThreadImpl(thread);
 }
 

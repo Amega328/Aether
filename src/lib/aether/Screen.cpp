@@ -467,12 +467,17 @@ bool Screen::isOnScreen() const
 
 bool Screen::isLockedToScreen() const
 {
-  if (uint32_t buttonID = 0; m_screen->isAnyMouseButtonDown(buttonID)) {
-    LOG_DEBUG("locked by mouse buttonID: %d", buttonID);
-    return true;
+  // Polled on every mouse move at the screen edge, so only log when the locking button changes.
+  uint32_t buttonID = 0;
+  const bool locked = m_screen->isAnyMouseButtonDown(buttonID);
+  if (m_lockingButton.update(locked ? buttonID : 0)) {
+    if (locked) {
+      LOG_DEBUG("locked to screen by mouse button %d", buttonID);
+    } else {
+      LOG_DEBUG("no longer locked to screen by a mouse button");
+    }
   }
-  // not locked
-  return false;
+  return locked;
 }
 
 int32_t Screen::getJumpZoneSize() const

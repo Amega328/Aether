@@ -13,6 +13,7 @@
 #include "aether/KeyTypes.h"
 #include "aether/MouseTypes.h"
 #include "aether/OptionTypes.h"
+#include "base/ChangeDetector.h"
 
 #include <array>
 #include <memory>
@@ -305,6 +306,7 @@ private:
 
   // true if the cursor is on this screen
   bool m_entered = false;
+  mutable ChangeDetector<uint32_t> m_lockingButton;
 
   // note toggle keys that toggles on up/down (false) or on
   // transition (true)
