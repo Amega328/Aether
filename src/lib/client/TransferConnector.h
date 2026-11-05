@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "aether/PacketStreamFilter.h"
 #include "aether/TransferHub.h"
 #include "net/NetworkAddress.h"
 #include "net/SecurityLevel.h"
@@ -44,6 +45,8 @@ private:
   struct Conn
   {
     IDataSocket *socket = nullptr;
+    //! Frames the handshake in packets, like the main connection; released before the socket is detached
+    std::unique_ptr<PacketStreamFilter> stream;
     EventQueueTimer *timer = nullptr;
     aether::transfer::StreamRequest request;
   };

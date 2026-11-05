@@ -6,6 +6,7 @@
 
 #include "client/TransferConnector.h"
 
+#include "aether/PacketStreamFilter.h"
 #include "aether/ProtocolTypes.h"
 #include "aether/ProtocolUtil.h"
 #include "arch/Arch.h"
@@ -84,7 +85,6 @@ void TransferConnector::dial(const StreamRequest &request)
     handleFailed(c, e);
   });
   m_events->addHandler(EventTypes::SocketDisconnected, target, [this, c](const auto &) { removeConn(c); });
-  m_events->addHandler(EventTypes::StreamInputReady, target, [this, c](const auto &) { handleHello(c); });
 
   c->timer = m_events->newOneShotTimer(kHelloTimeout, nullptr);
   m_events->addHandler(EventTypes::Timer, c->timer, [this, c](const auto &) {
@@ -107,6 +107,12 @@ void TransferConnector::handleConnected(Conn *conn)
   m_events->removeHandler(EventTypes::DataSocketSecureConnected, target);
   m_events->removeHandler(EventTypes::DataSocketConnectionFailed, target);
 
+  // The server speaks the normal packet-framed handshake, so read its hello the way Client does.
+  conn->stream = std::make_unique<PacketStreamFilter>(m_events, conn->socket, false);
+  m_events->addHandler(EventTypes::StreamInputReady, conn->stream->getEventTarget(), [this, conn](const auto &) {
+    handleHello(conn);
+  });
+
   if (conn->socket->isReady()) {
     m_events->addEvent(Event(EventTypes::StreamInputReady, target));
   }
@@ -126,7 +132,7 @@ void TransferConnector::handleHello(Conn *conn)
   int16_t serverMinor;
   std::string protocolName;
 
-  if (!ProtocolUtil::readf(conn->socket, kMsgHello, &protocolName, &serverMajor, &serverMinor) ||
+  if (!ProtocolUtil::readf(conn->stream.get(), kMsgHello, &protocolName, &serverMajor, &serverMinor) ||
       networkProtocolFromString(QString::fromStdString(protocolName)) == NetworkProtocol::Unknown ||
       serverMajor != kProtocolMajorVersion) {
     LOG_WARN("file transfer: bad hello from server");
@@ -139,13 +145,15 @@ void TransferConnector::handleHello(Conn *conn)
   const std::string helloBackMessage = protocolName + kMsgHelloBackArgs;
 
   try {
-    ProtocolUtil::writef(conn->socket, helloBackMessage.c_str(), kProtocolMajorVersion, helloBackMinor, &name);
+    ProtocolUtil::writef(conn->stream.get(), helloBackMessage.c_str(), kProtocolMajorVersion, helloBackMinor, &name);
   } catch (BaseException &e) {
     LOG_WARN("file transfer: hello-back write failed: %s", e.what());
     removeConn(conn);
     return;
   }
 
+  // Nothing may stay in the filter: the server sends no data before it has our hello-back.
+  conn->stream.reset();
   auto channel = conn->socket->detachBulkChannel();
   if (!channel) {
     LOG_WARN("file transfer: could not take over the connection");
@@ -168,6 +176,10 @@ void TransferConnector::removeConn(Conn *conn)
   if (conn->timer != nullptr) {
     m_events->removeHandler(EventTypes::Timer, conn->timer);
     m_events->deleteTimer(conn->timer);
+  }
+  if (conn->stream != nullptr) {
+    m_events->removeHandlers(conn->stream->getEventTarget());
+    conn->stream.reset();
   }
   if (conn->socket != nullptr) {
     m_events->removeHandlers(conn->socket->getEventTarget());
