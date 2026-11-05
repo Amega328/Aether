@@ -233,6 +233,11 @@ enum class EventTypes : uint32_t
   /// This event is sent whenever a clipboard chunk is transferred.
   ClipboardSending,
 
+  /** A large file transfer has completed or failed. Posted from a transfer worker thread to the
+      Screen that applies the received files to the clipboard. No event data.
+  */
+  FileTransferFinished,
+
   /// Start libei
   EIConnected,
 

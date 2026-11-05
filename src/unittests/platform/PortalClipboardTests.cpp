@@ -7,6 +7,7 @@
 #include "PortalClipboardTests.h"
 
 #include "aether/ClipboardFiles.h"
+#include "aether/TransferManifest.h"
 #include "platform/PortalClipboard.h"
 
 #include <filesystem>
@@ -164,8 +165,16 @@ void PortalClipboardTests::packRespectsSizeLimit()
   writeFile(source / "big.bin", std::string(4096, 'x'));
 
   const auto list = QByteArray::fromStdString(toFileUri(source / "big.bin") + "\r\n");
-  QVERIFY(PortalClipboard::decodeFormat(mime("text/uri-list"), list, 1024).isEmpty());
-  QVERIFY(!PortalClipboard::decodeFormat(mime("text/uri-list"), list, 1024 * 1024).isEmpty());
+  // Over the inline limit the clipboard carries a transfer manifest instead of the contents.
+  const auto overLimit = PortalClipboard::decodeFormat(mime("text/uri-list"), list, 1024);
+  QVERIFY(!overLimit.isEmpty());
+  QVERIFY(aether::transfer::isManifestPayload(overLimit.toStdString()));
+  QVERIFY(overLimit.size() < 512);
+
+  const auto inlined = PortalClipboard::decodeFormat(mime("text/uri-list"), list, 1024 * 1024);
+  QVERIFY(!inlined.isEmpty());
+  QVERIFY(!aether::transfer::isManifestPayload(inlined.toStdString()));
+  QVERIFY(inlined.size() > 4096);
 }
 
 void PortalClipboardTests::invalidInputYieldsNothing()

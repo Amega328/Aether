@@ -94,6 +94,15 @@ std::vector<fs::path> stageFiles(const QByteArray &payload)
   if (!current.dir.empty() && current.hash == hash && current.size == view.size() && fs::exists(current.dir, ec))
     return current.topLevel;
 
+  if (aether::clipboard::isLocalPathsPayload(view)) {
+    try {
+      return aether::clipboard::decodeLocalPaths(view);
+    } catch (const std::exception &e) {
+      LOG_WARN("failed to read staged clipboard files: %s", e.what());
+      return {};
+    }
+  }
+
   const auto root = stagingRoot();
   pruneStaging(root, std::exchange(firstUse, false));
 
@@ -240,7 +249,7 @@ QByteArray PortalClipboard::decodeFormat(const SupportedMime &entry, const QByte
 
     try {
       const auto limit = std::min<uint64_t>(static_cast<uint64_t>(maxBytes), aether::clipboard::kMaxPackBytes);
-      return QByteArray::fromStdString(aether::clipboard::packFiles(paths, limit));
+      return QByteArray::fromStdString(aether::clipboard::offerFiles(paths, limit));
     } catch (const std::exception &e) {
       LOG_WARN("failed to pack clipboard files: %s", e.what());
       return {};

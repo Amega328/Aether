@@ -6,8 +6,10 @@
 
 #include "aether/ClipboardFiles.h"
 
+#include "aether/TransferHub.h"
 #include "base/Log.h"
 
+#include <algorithm>
 #include <cctype>
 #include <fstream>
 #include <optional>
@@ -133,9 +135,9 @@ uint64_t addPath(
   return used;
 }
 
-// Reject names that could escape the staging directory or are
-// invalid on common filesystems.
-bool isSafeName(const std::string &name)
+} // namespace
+
+bool aether::clipboard::isSafeEntryName(const std::string &name)
 {
   if (name.empty() || name.size() > 512)
     return false;
@@ -155,8 +157,6 @@ bool isSafeName(const std::string &name)
   }
   return true;
 }
-
-} // namespace
 
 std::string aether::clipboard::packFiles(const std::vector<std::filesystem::path> &paths, uint64_t maxBytes)
 {
@@ -211,7 +211,7 @@ aether::clipboard::unpackFiles(std::string_view data, const std::filesystem::pat
 
     const uint64_t size = readUInt64(data);
 
-    if (!isSafeName(name))
+    if (!isSafeEntryName(name))
       throw ClipboardFilesError("unsafe entry name: " + name);
 
     const auto target =
@@ -355,4 +355,85 @@ std::vector<std::filesystem::path> aether::clipboard::fromUriList(std::string_vi
       paths.push_back(std::move(*path));
   }
   return paths;
+}
+
+namespace {
+
+constexpr uint32_t kLocalPathsMagic = 0x41464c31; // "AFL1"
+
+} // namespace
+
+std::string aether::clipboard::offerFiles(const std::vector<std::filesystem::path> &paths, uint64_t inlineLimit)
+{
+  namespace transfer = aether::transfer;
+  try {
+    auto &hub = transfer::TransferHub::instance();
+    if (auto staged = hub.recognizeStaged(paths))
+      return *staged;
+
+    auto source = transfer::buildSource(paths);
+    if (source.manifest.entries.empty())
+      return {};
+
+    if (source.manifest.totalBytes() <= std::min(inlineLimit, kInlineBytes))
+      return packFiles(paths);
+
+    LOG_DEBUG(
+        "offering %zu clipboard file entries (%llu bytes) for transfer", source.manifest.entries.size(),
+        static_cast<unsigned long long>(source.manifest.totalBytes())
+    );
+    return hub.offer(std::move(source));
+  } catch (const transfer::TransferError &e) {
+    throw ClipboardFilesError(e.what());
+  }
+}
+
+std::string aether::clipboard::encodeLocalPaths(const std::vector<std::filesystem::path> &paths)
+{
+  std::string out;
+  writeUInt32(out, kLocalPathsMagic);
+  writeUInt32(out, static_cast<uint32_t>(paths.size()));
+  for (const auto &path : paths) {
+    const auto utf8 = toUtf8(path);
+    writeUInt32(out, static_cast<uint32_t>(utf8.size()));
+    out += utf8;
+  }
+  return out;
+}
+
+bool aether::clipboard::isLocalPathsPayload(std::string_view payload)
+{
+  if (payload.size() < 4)
+    return false;
+  return readUInt32(payload) == kLocalPathsMagic;
+}
+
+std::vector<std::filesystem::path> aether::clipboard::decodeLocalPaths(std::string_view payload)
+{
+  if (readUInt32(payload) != kLocalPathsMagic)
+    throw ClipboardFilesError("not a local paths payload");
+
+  const uint32_t count = readUInt32(payload);
+  if (count > 100000)
+    throw ClipboardFilesError("unreasonable entry count");
+
+  std::vector<std::filesystem::path> paths;
+  for (uint32_t i = 0; i < count; ++i) {
+    const uint32_t length = readUInt32(payload);
+    if (length > payload.size())
+      throw ClipboardFilesError("truncated path");
+    paths.emplace_back(std::u8string_view(reinterpret_cast<const char8_t *>(payload.data()), length));
+    payload.remove_prefix(length);
+  }
+  return paths;
+}
+
+std::vector<std::filesystem::path>
+aether::clipboard::materializeFiles(std::string_view payload, const std::filesystem::path &stagingDir)
+{
+  if (isLocalPathsPayload(payload))
+    return decodeLocalPaths(payload);
+  if (aether::transfer::isManifestPayload(payload))
+    throw ClipboardFilesError("file transfer has not finished yet");
+  return unpackFiles(payload, stagingDir);
 }

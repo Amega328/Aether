@@ -23,6 +23,9 @@
 #include "server/ClientProxy1_6.h"
 #include "server/ClientProxy1_7.h"
 #include "server/ClientProxy1_8.h"
+#include "aether/TransferHub.h"
+#include "io/StreamFilter.h"
+#include "net/IDataSocket.h"
 #include "server/PortForwardSession.h"
 #include "server/Server.h"
 
@@ -251,6 +254,32 @@ void ClientProxyUnknown::handleData()
           m_stream, static_cast<uint16_t>(port), m_server, m_events, [this] { sendFailure(); }
       );
       m_stream = nullptr;
+      return;
+    }
+
+    // a client name of "aetherxfer:..." is a data connection of a large file
+    // transfer: take the socket out of the event loop and give it to a worker
+    if (name.compare(0, std::strlen(kTransferNamePrefix), kTransferNamePrefix) == 0) {
+      const auto request = aether::transfer::parseHelloName(name);
+      if (!request || !m_server->clipboardSharingEnabled()) {
+        LOG_WARN("rejected file transfer request \"%s\"", name.c_str());
+        sendFailure();
+        return;
+      }
+
+      removeTimer();
+      const auto *filter = dynamic_cast<StreamFilter *>(m_stream);
+      auto *socket = filter ? dynamic_cast<IDataSocket *>(filter->getStream()) : nullptr;
+      auto channel = socket ? socket->detachBulkChannel() : nullptr;
+      if (!channel) {
+        LOG_WARN("could not take over the file transfer connection");
+        sendFailure();
+        return;
+      }
+
+      aether::transfer::TransferHub::instance().serve(std::move(channel), *request, aether::transfer::Side::Server);
+      // nothing else uses this connection now; let the listener discard the placeholder
+      sendFailure();
       return;
     }
 

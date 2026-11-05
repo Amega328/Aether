@@ -15,6 +15,7 @@
 #include "common/NetworkProtocol.h"
 #include "common/Settings.h"
 #include "aether/Clipboard.h"
+#include "aether/TransferHub.h"
 #include "aether/AetherException.h"
 #include "aether/IPlatformScreen.h"
 #include "aether/PacketStreamFilter.h"
@@ -406,6 +407,17 @@ void Client::sendClipboard(ClipboardID id)
       m_sentClipboard[id] = true;
       m_dataClipboard[id] = data;
       m_server->onClipboardChanged(id, &clipboard);
+
+      if (clipboard.has(IClipboard::Format::Files)) {
+        const auto files = clipboard.get(IClipboard::Format::Files);
+        if (aether::transfer::isManifestPayload(files)) {
+          try {
+            aether::transfer::TransferHub::instance().announceSent(aether::transfer::decodeManifest(files));
+          } catch (const std::exception &e) {
+            LOG_WARN("not sending files to the server: %s", e.what());
+          }
+        }
+      }
     }
   }
 }

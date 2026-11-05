@@ -52,6 +52,40 @@ stagingDir, in payload order.
 */
 std::vector<std::filesystem::path> unpackFiles(std::string_view data, const std::filesystem::path &stagingDir);
 
+// Selections up to this size are packed into the clipboard itself, which also
+// keeps them working with peers that predate large file transfer.
+constexpr uint64_t kInlineBytes = 1ull * 1024 * 1024;
+
+//! Files clipboard payload for a copied selection.
+/*!
+Small selections are packed inline. Anything larger (or exceeding
+\c inlineLimit) is registered with the TransferHub and described by a
+compact manifest; the bytes travel on separate connections. Files that a
+finished transfer staged on this machine map back to their original manifest.
+Throws ClipboardFilesError when a path is unreadable. Empty for no files.
+*/
+std::string offerFiles(const std::vector<std::filesystem::path> &paths, uint64_t inlineLimit = kInlineBytes);
+
+//! Payload naming files that already exist on this machine (internal, never sent to peers).
+std::string encodeLocalPaths(const std::vector<std::filesystem::path> &paths);
+bool isLocalPathsPayload(std::string_view payload);
+std::vector<std::filesystem::path> decodeLocalPaths(std::string_view payload);
+
+//! Local top-level paths for a Files payload ready to hand to the OS.
+/*!
+Inline payloads are unpacked into \c stagingDir; local-path payloads are
+returned as they are. A transfer manifest throws, since its bytes have to be
+received first.
+*/
+std::vector<std::filesystem::path> materializeFiles(std::string_view payload, const std::filesystem::path &stagingDir);
+
+//! Whether an entry name is safe to create under a staging directory.
+/*!
+Rejects empty or oversized names, absolute paths, drive prefixes, ".."
+components, control characters and characters Windows filesystems refuse.
+*/
+bool isSafeEntryName(const std::string &name);
+
 //! Percent-encoded "file://" URI for an absolute path.
 std::string toFileUri(const std::filesystem::path &absolutePath);
 

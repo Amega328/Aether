@@ -13,6 +13,8 @@
 #include "base/Log.h"
 #include "client/Client.h"
 #include "client/PortShareListener.h"
+#include "client/TransferConnector.h"
+#include "aether/TransferHub.h"
 #include "common/ExitCodes.h"
 #include "common/PlatformInfo.h"
 #include "common/Settings.h"
@@ -176,6 +178,7 @@ void ClientApp::handleClientConnected()
   m_currentServerIndex = 0;
   m_lastServerAddressIndex = 0;
   startPortShare();
+  startTransfers();
 }
 
 void ClientApp::startPortShare()
@@ -214,6 +217,26 @@ void ClientApp::startPortShare()
 void ClientApp::stopPortShare()
 {
   m_portShare.reset();
+}
+
+void ClientApp::startTransfers()
+{
+  stopTransfers();
+  if (m_client == nullptr) {
+    return;
+  }
+
+  m_transfers = std::make_unique<TransferConnector>(
+      getEvents(), std::unique_ptr<ISocketFactory>(getSocketFactory()), m_client->getServerAddress(),
+      Settings::value(Settings::Security::TlsEnabled).toBool()
+  );
+  m_transfers->start();
+}
+
+void ClientApp::stopTransfers()
+{
+  m_transfers.reset();
+  aether::transfer::TransferHub::instance().shutdown();
 }
 
 void ClientApp::handleClientFailed(const Event &e)
@@ -263,6 +286,7 @@ void ClientApp::handleClientRefused(const Event &e)
 void ClientApp::handleClientDisconnected()
 {
   stopPortShare();
+  stopTransfers();
   m_retryCount = 0;
   LOG_DEBUG("disconnected from server");
   ipcSendConnectionState(aether::core::ConnectionState::Disconnected);
@@ -351,6 +375,7 @@ bool ClientApp::startClient()
 void ClientApp::stopClient()
 {
   stopPortShare();
+  stopTransfers();
   closeClient(m_client);
   closeClientScreen(m_clientScreen);
   m_client = nullptr;

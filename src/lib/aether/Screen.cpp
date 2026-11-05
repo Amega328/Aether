@@ -9,6 +9,8 @@
 #include "base/IEventQueue.h"
 #include "base/Log.h"
 #include "aether/IPlatformScreen.h"
+#include "aether/ClipboardFiles.h"
+#include "aether/TransferHub.h"
 
 #include <QProcess>
 
@@ -39,6 +41,25 @@ bool runScreenCommand(const QString &commandLine)
   return QProcess::startDetached(program, args);
 }
 
+//! Copy of \c in without its Files format, plus \c files when given.
+std::unique_ptr<Clipboard> copyClipboard(const IClipboard &in, const std::string *files)
+{
+  auto copy = std::make_unique<Clipboard>();
+  copy->open(0);
+  copy->empty();
+  for (int format = 0; format < static_cast<int>(IClipboard::Format::TotalFormats); ++format) {
+    const auto type = static_cast<IClipboard::Format>(format);
+    if (type != IClipboard::Format::Files && in.has(type)) {
+      copy->add(type, in.get(type));
+    }
+  }
+  if (files != nullptr) {
+    copy->add(IClipboard::Format::Files, *files);
+  }
+  copy->close();
+  return copy;
+}
+
 } // namespace
 
 //
@@ -56,11 +77,18 @@ Screen::Screen(IPlatformScreen *platformScreen, IEventQueue *events)
   // reset options
   resetOptions();
 
+  m_events->addHandler(EventTypes::FileTransferFinished, this, [this](const auto &) { handleTransferFinished(); });
+  transfer::TransferHub::instance().setListener([this](const transfer::Token &) {
+    m_events->addEvent(Event(EventTypes::FileTransferFinished, this));
+  });
+
   LOG_DEBUG("opened display");
 }
 
 Screen::~Screen()
 {
+  transfer::TransferHub::instance().setListener({});
+  m_events->removeHandler(EventTypes::FileTransferFinished, this);
 
   if (m_enabled) {
     disable();
@@ -204,9 +232,85 @@ void Screen::warpCursor(int32_t x, int32_t y)
   m_screen->warpCursor(x, y);
 }
 
+void Screen::applyClipboard(ClipboardID id, const IClipboard &clipboard, const std::string *files)
+{
+  const auto copy = copyClipboard(clipboard, files);
+  m_screen->setClipboard(id, copy.get());
+}
+
 void Screen::setClipboard(ClipboardID id, const IClipboard *clipboard)
 {
-  m_screen->setClipboard(id, clipboard);
+  m_pendingFiles[id] = {};
+
+  if (clipboard == nullptr || !clipboard->has(IClipboard::Format::Files)) {
+    m_screen->setClipboard(id, clipboard);
+    return;
+  }
+
+  const auto files = clipboard->get(IClipboard::Format::Files);
+
+  // Staged-path payloads only ever come from this machine; never trust one from a peer.
+  if (aether::clipboard::isLocalPathsPayload(files)) {
+    LOG_WARN("ignoring local file paths received from the peer");
+    applyClipboard(id, *clipboard, nullptr);
+    return;
+  }
+
+  if (!transfer::isManifestPayload(files)) {
+    m_screen->setClipboard(id, clipboard);
+    return;
+  }
+
+  transfer::Manifest manifest;
+  try {
+    manifest = transfer::decodeManifest(files);
+  } catch (const std::exception &e) {
+    LOG_WARN("ignoring invalid file transfer from the peer: %s", e.what());
+    applyClipboard(id, *clipboard, nullptr);
+    return;
+  }
+
+  const auto progress = transfer::TransferHub::instance().request(manifest);
+  switch (progress.state) {
+  case transfer::ReceiveSession::State::Complete: {
+    const auto staged = aether::clipboard::encodeLocalPaths(progress.paths);
+    applyClipboard(id, *clipboard, &staged);
+    break;
+  }
+  case transfer::ReceiveSession::State::Receiving: {
+    // Leave the current clipboard alone until the files have arrived.
+    m_pendingFiles[id].clipboard = copyClipboard(*clipboard, nullptr);
+    m_pendingFiles[id].token = manifest.token;
+    break;
+  }
+  case transfer::ReceiveSession::State::Failed:
+    LOG_WARN("file transfer failed: %s", progress.error.c_str());
+    applyClipboard(id, *clipboard, nullptr);
+    break;
+  }
+}
+
+void Screen::handleTransferFinished()
+{
+  for (ClipboardID id = 0; id < kClipboardEnd; ++id) {
+    auto &pending = m_pendingFiles[id];
+    if (!pending.clipboard) {
+      continue;
+    }
+
+    const auto progress = transfer::TransferHub::instance().status(pending.token);
+    if (progress && progress->state == transfer::ReceiveSession::State::Receiving) {
+      continue;
+    }
+
+    const auto clipboard = std::move(pending.clipboard);
+    pending = {};
+    if (progress && progress->state == transfer::ReceiveSession::State::Complete) {
+      LOG_INFO("received files are ready to paste");
+      const auto staged = aether::clipboard::encodeLocalPaths(progress->paths);
+      applyClipboard(id, *clipboard, &staged);
+    }
+  }
 }
 
 void Screen::grabClipboard(ClipboardID id)

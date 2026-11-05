@@ -47,7 +47,7 @@ HANDLE MSWindowsClipboardFilesConverter::fromIClipboard(const std::string &data)
 
   std::vector<std::filesystem::path> staged;
   try {
-    staged = aether::clipboard::unpackFiles(data, stagingDir);
+    staged = aether::clipboard::materializeFiles(data, stagingDir);
   } catch (const std::exception &e) {
     LOG_WARN("failed to unpack clipboard files: %s", e.what());
     std::error_code ec;
@@ -112,7 +112,7 @@ std::string MSWindowsClipboardFilesConverter::toIClipboard(HANDLE data) const
   GlobalUnlock(data);
 
   try {
-    return aether::clipboard::packFiles(paths);
+    return aether::clipboard::offerFiles(paths);
   } catch (const std::exception &e) {
     LOG_WARN("failed to pack clipboard files: %s", e.what());
     return {};

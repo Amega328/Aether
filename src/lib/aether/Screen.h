@@ -7,12 +7,15 @@
 
 #pragma once
 
+#include "aether/Clipboard.h"
 #include "aether/ClipboardTypes.h"
 #include "aether/IScreen.h"
 #include "aether/KeyTypes.h"
 #include "aether/MouseTypes.h"
 #include "aether/OptionTypes.h"
 
+#include <array>
+#include <memory>
 #include <string>
 
 class IClipboard;
@@ -311,6 +314,18 @@ private:
   bool m_fakeInput = false;
 
   IEventQueue *m_events = nullptr;
+
+  //! A clipboard whose files are still being received from the peer
+  struct PendingFiles
+  {
+    std::unique_ptr<Clipboard> clipboard;
+    std::array<uint8_t, 16> token{};
+  };
+
+  void applyClipboard(ClipboardID id, const IClipboard &clipboard, const std::string *files);
+  void handleTransferFinished();
+
+  std::array<PendingFiles, kClipboardEnd> m_pendingFiles;
 };
 
 } // namespace aether

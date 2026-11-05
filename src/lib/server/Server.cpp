@@ -188,6 +188,11 @@ size_t Server::getMaximumClipboardSizeBytes() const
   return m_maximumClipboardSize * 1024;
 }
 
+bool Server::clipboardSharingEnabled() const
+{
+  return m_enableClipboard && m_maximumClipboardSize != 0;
+}
+
 std::vector<uint16_t> Server::sharedPorts() const
 {
   return m_config->sharedPorts();

@@ -208,6 +208,9 @@ public:
   */
   std::vector<uint16_t> sharedPorts() const;
 
+  //! Whether clipboard sharing (and with it file transfer) is on and has a non-zero size limit
+  bool clipboardSharingEnabled() const;
+
   //@}
 
 private:

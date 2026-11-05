@@ -23,6 +23,7 @@ class ClientArgs;
 class Event;
 class Client;
 class PortShareListener;
+class TransferConnector;
 class Thread;
 class ISocketFactory;
 
@@ -93,10 +94,13 @@ private:
   void tryNextServer();
   void startPortShare();
   void stopPortShare();
+  void startTransfers();
+  void stopTransfers();
 
   bool m_suspended = false;
   Client *m_client = nullptr;
   std::unique_ptr<PortShareListener> m_portShare;
+  std::unique_ptr<TransferConnector> m_transfers;
   aether::Screen *m_clientScreen = nullptr;
   QList<NetworkAddress> m_serverAddresses;
   size_t m_currentServerIndex = 0;
