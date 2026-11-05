@@ -14,6 +14,11 @@
 #include "mt/Mutex.h"
 #include "net/IDataSocket.h"
 
+#include <memory>
+#include <string>
+
+struct ssl_st;
+
 class Mutex;
 class Thread;
 class ISocketMultiplexerJob;
@@ -57,9 +62,20 @@ public:
   // IDataSocket overrides
   void connect(const NetworkAddress &) override;
 
+  std::unique_ptr<BulkChannel> detachBulkChannel() override;
+
   virtual ISocketMultiplexerJob *newJob();
 
 protected:
+  struct DetachedSocket
+  {
+    ArchSocket socket = nullptr;
+    std::string pending;
+  };
+
+  bool detachSocket(DetachedSocket &detached);
+  static std::unique_ptr<BulkChannel> makeBulkChannel(DetachedSocket &&detached, ssl_st *ssl);
+
   enum class JobResult
   {
     Break = -1, //!< Break the Job chain

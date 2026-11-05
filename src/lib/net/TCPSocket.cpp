@@ -19,6 +19,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <utility>
 
 static const std::size_t s_maxInputBufferSize = 1024 * 1024;
 
@@ -356,6 +357,47 @@ TCPSocket::JobResult TCPSocket::doWrite()
   }
 
   return JobResult::Retry;
+}
+
+bool TCPSocket::detachSocket(DetachedSocket &detached)
+{
+  // The multiplexer thread drains the output buffer; leave nothing behind.
+  flush();
+  setJob(nullptr);
+
+  Lock lock(&m_mutex);
+  if (m_socket == nullptr || !m_connected) {
+    return false;
+  }
+
+  if (const uint32_t buffered = m_inputBuffer.getSize(); buffered > 0) {
+    detached.pending.assign(static_cast<const char *>(m_inputBuffer.peek(buffered)), buffered);
+  }
+  detached.socket = std::exchange(m_socket, nullptr);
+  onDisconnected();
+  return true;
+}
+
+std::unique_ptr<BulkChannel> TCPSocket::makeBulkChannel(DetachedSocket &&detached, ssl_st *ssl)
+{
+  const ArchSocket archSocket = detached.socket;
+#if defined(_WIN32)
+  const auto native = static_cast<SocketBulkChannel::NativeSocket>(archSocket->m_socket);
+#else
+  const auto native = archSocket->m_fd;
+#endif
+  return std::make_unique<SocketBulkChannel>(native, ssl, std::move(detached.pending), [archSocket] {
+    ARCH->closeSocket(archSocket);
+  });
+}
+
+std::unique_ptr<BulkChannel> TCPSocket::detachBulkChannel()
+{
+  DetachedSocket detached;
+  if (!detachSocket(detached)) {
+    return nullptr;
+  }
+  return makeBulkChannel(std::move(detached), nullptr);
 }
 
 void TCPSocket::setJob(ISocketMultiplexerJob *job)

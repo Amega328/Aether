@@ -14,6 +14,8 @@ find_package(Qt6 ${REQUIRED_QT_VERSION} REQUIRED COMPONENTS Network)
 find_package(OpenSSL ${REQUIRED_OPENSSL_VERSION} REQUIRED COMPONENTS SSL Crypto)
 
 add_library(net STATIC
+  BulkChannel.cpp
+  BulkChannel.h
   Fingerprint.cpp
   Fingerprint.h
   FingerprintDatabase.cpp

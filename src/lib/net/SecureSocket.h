@@ -68,6 +68,8 @@ public:
   void initSsl(bool server);
   bool loadCertificate(const QString &filename);
 
+  std::unique_ptr<BulkChannel> detachBulkChannel() override;
+
 private:
   // SSL
   void initContext(bool server);

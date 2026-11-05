@@ -8,8 +8,10 @@
 #pragma once
 
 #include "io/IStream.h"
+#include "net/BulkChannel.h"
 #include "net/ISocket.h"
 
+#include <memory>
 #include <string>
 
 //! Data stream socket interface
@@ -54,4 +56,17 @@ public:
   void *getEventTarget() const override;
 
   virtual bool isFatal() const = 0;
+
+  //! Hand the connection to a blocking BulkChannel
+  /*!
+  Flushes pending output, takes the socket out of the multiplexer and moves
+  the descriptor, any TLS state and already buffered input into the returned
+  channel. The socket is left disconnected and should be deleted afterwards.
+  Must not be called from the multiplexer thread. Returns null when the
+  socket is not connected or does not support detaching.
+  */
+  virtual std::unique_ptr<BulkChannel> detachBulkChannel()
+  {
+    return nullptr;
+  }
 };

@@ -25,6 +25,7 @@
 #include <memory>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <utility>
 
 //
 // SecureSocket
@@ -73,6 +74,35 @@ void SecureSocket::close()
 {
   freeSSL();
   TCPSocket::close();
+}
+
+std::unique_ptr<BulkChannel> SecureSocket::detachBulkChannel()
+{
+  if (!m_secureReady || m_writeRetry) {
+    return nullptr;
+  }
+
+  // Must not hold ssl_mutex_ here: draining the output buffer needs the
+  // multiplexer thread, which takes it to write.
+  DetachedSocket detached;
+  if (!detachSocket(detached)) {
+    return nullptr;
+  }
+
+  SSL *ssl = nullptr;
+  {
+    std::scoped_lock ssl_lock{ssl_mutex_};
+    if (m_ssl) {
+      ssl = std::exchange(m_ssl->m_ssl, nullptr);
+    }
+    m_secureReady = false;
+  }
+
+  if (ssl == nullptr) {
+    ARCH->closeSocket(detached.socket);
+    return nullptr;
+  }
+  return makeBulkChannel(std::move(detached), ssl);
 }
 
 void SecureSocket::connect(const NetworkAddress &addr)
