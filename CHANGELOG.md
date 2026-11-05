@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   managers on Wayland clients (via `text/uri-list` and
   `x-special/gnome-copied-files`), and files copied on a Wayland client can be
   pasted on Windows. Transfers are limited by the clipboard size setting.
+- Large file transfer: copied files and folders larger than 1 MiB are no longer
+  packed into the clipboard. The clipboard carries only a small file list and
+  the contents stream on dedicated encrypted connections (up to 4 in parallel),
+  so there is no size limit beyond free disk space, mouse and keyboard stay
+  responsive during a transfer, and nothing is held in memory. The transfer
+  starts when the cursor moves to the other machine and the files appear on the
+  clipboard once they have arrived; progress and speed are logged. Both peers
+  need this version; smaller selections still work with older peers.
 
 ### Fixed
 - Wayland clients could end up with an empty clipboard when a paste request

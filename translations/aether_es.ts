@@ -413,8 +413,66 @@ Do you want to connect to the server?
         <translation>&lt;p&gt;Error al conectar con el servidor &apos;%1&apos;.&lt;/p&gt;&lt;p&gt;A Client with your name is already connected to the server.&lt;/p&gt;Please ensure that you&apos;re using a unique name and that only a single instance of the client process is running.&lt;/p&gt;</translation>
     </message>
     <message>
+        <source>Settings and update options</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Your current TLS key is smaller than the minimum allowed size, A new key 2048-bit key will be generated.</source>
         <translation type="unfinished">Su clave TLS actual es más pequeña que el tamaño mínimo permitido. Se generará una nueva clave de 2048 bits.</translation>
+    </message>
+    <message>
+        <source>Port share settings saved. Restarting core to apply...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Checking…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Check for updates</source>
+        <translation type="unfinished">Buscar actualizaciones</translation>
+    </message>
+    <message>
+        <source>Aether is up to date</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>You’re running the latest version of Aether.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Update check failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not check for updates.
+
+%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Update available: v%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Click to download Aether v%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Update available</source>
+        <translation type="unfinished">Actualización disponible</translation>
+    </message>
+    <message>
+        <source>Aether %1 is available. Would you like to download it?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Download</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Later</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Address missing</source>
@@ -455,6 +513,62 @@ Do you want to connect to the server?
     <message>
         <source>%1 Connection Error</source>
         <translation>%1 Error de conexión</translation>
+    </message>
+    <message>
+        <source>Peers · %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TLS secure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The Aether connection is encrypted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The Aether connection is not encrypted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Round-trip latency appears after a connected peer replies to a heartbeat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Max RTT · %1 ms</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>RTT · %1 ms</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mode: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Server</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Client</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Status: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Security: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connected peers: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connection details copied</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>No IP Detected</source>
@@ -712,10 +826,6 @@ QPushButton#btnToggleCore:disabled { background: palette(button);  }</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>QFrame { border: 1px solid palette(mid); border-radius: 10px; background: palette(base); }</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Share my ports (server)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -729,18 +839,6 @@ QPushButton#btnToggleCore:disabled { background: palette(button);  }</source>
     </message>
     <message>
         <source>Tunnel server ports (client)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>While connected, these localhost ports on this machine reach the server&apos;s localhost. Comma separated.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>3000, 5173</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Save port settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -813,6 +911,69 @@ QPushButton#btnToggleCore:disabled { background: palette(button);  }</source>
     </message>
     <message>
         <source>Pick a server, then Connect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QWidget#navRail { border-right: 1px solid palette(mid); }
+QPushButton#navWorkspace, QPushButton#navPortShare { border: none; border-radius: 8px; padding: 8px 12px; text-align: left; font-size: 13px; min-height: 22px; icon-size: 16px; color: palette(text); background: transparent; }
+QPushButton#navWorkspace:hover:!checked, QPushButton#navPortShare:hover:!checked { background: palette(alternate-base); }
+QPushButton#navWorkspace:checked, QPushButton#navPortShare:checked { background: palette(highlight); color: palette(highlighted-text); font-weight: 600; }</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QLabel#lblLatencyPill { border: 1px solid palette(mid); border-radius: 10px; padding: 4px 10px; font-size: 11px; font-weight: 600; }</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>RTT · —</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QLabel#lblPeerPill { border: 1px solid palette(mid); border-radius: 10px; padding: 4px 10px; font-size: 11px; font-weight: 600; }</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Peers · 0</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QLabel#lblSecurityPill { border: 1px solid palette(mid); border-radius: 10px; padding: 4px 10px; font-size: 11px; font-weight: 600; }</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TLS off</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy connection status and peer latency details</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy details</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QFrame#portShareServerCard { border: 1px solid palette(mid); border-radius: 12px; background: palette(base); }</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QFrame#portShareClientCard { border: 1px solid palette(mid); border-radius: 12px; background: palette(base); }</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>While connected, these localhost ports on this machine reach the server&apos;s localhost. Use serverPort:localPort to remap, e.g. 3001:8080 listens on localhost:8080 and reaches the server&apos;s port 3001.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>3000, 5173, 3001:8080</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Saving restarts the core if it&apos;s running.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1575,7 +1736,7 @@ Al habilitar esta opción, se deshabilitará la interfaz gráfica de usuario (GU
     </message>
     <message>
         <source>A new version v%1 is available</source>
-        <translation type="unfinished">Ya está disponible una nueva versión v%1</translation>
+        <translation type="obsolete">Ya está disponible una nueva versión v%1</translation>
     </message>
     <message>
         <source>View local fingerprint</source>
@@ -1583,7 +1744,7 @@ Al habilitar esta opción, se deshabilitará la interfaz gráfica de usuario (GU
     </message>
     <message>
         <source>Update available</source>
-        <translation type="unfinished">Actualización disponible</translation>
+        <translation type="obsolete">Actualización disponible</translation>
     </message>
     <message>
         <source>%1 is connecting...</source>
@@ -1600,6 +1761,13 @@ Al habilitar esta opción, se deshabilitará la interfaz gráfica de usuario (GU
     <message>
         <source>Encryption Disabled</source>
         <translation type="unfinished">Cifrado deshabilitado</translation>
+    </message>
+</context>
+<context>
+    <name>VersionChecker</name>
+    <message>
+        <source>The update server returned an invalid response.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
